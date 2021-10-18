@@ -1,18 +1,13 @@
 #include <iostream>
 #include <utilities.h>
-#include <imatistl.h>
 #include <map>
 #include <string>
+#include <trianglehelper.h>
+#include <Point3D.h>
 
 using namespace std;
 const double OFFSET = 1e-4;
 
-/**
- * @brief exec chiamata shell con output in formato testuale
- * @param cmd il comadno da eseguire nella shell
- * @return l'output del comando
- */
-std::string exec(const char* cmd);
 
 int main(int argc, char *argv[])
 {
@@ -21,117 +16,104 @@ int main(int argc, char *argv[])
         std::cerr << "Missing shapefile parameter" << std::endl;
         return 1;
     }
-    std::vector<std::vector<Utilities::Point3D> > boundaries;
+    std::vector<std::vector<Point3D> > boundaries;
+    std::vector<std::vector<unsigned int> > triangles;
     Utilities::load_shapefile_shp(argv[1], boundaries);
-    Utilities::Point3D mean(0,0,0);
-    unsigned int points_num = 0;
+    Point3D mean(0,0,0);
+    unsigned int points_number = 0;
+    unsigned int triangles_number = 0;
     for(unsigned int i = 0; i < boundaries.size(); i++)
     {
         for(unsigned int j = 0; j < boundaries[i].size(); j++)
         {
             mean = mean + boundaries[i][j];
-            points_num++;
+            points_number++;
         }
     }
-    mean = mean / points_num;
+    mean = mean / points_number;
     for(unsigned int i = 0; i < boundaries.size(); i++)
         for(unsigned int j = 0; j < boundaries[i].size(); j++)
             boundaries[i][j] = boundaries[i][j] - mean;
     Utilities::fix_polygons(boundaries);
-    std::ofstream remaining_polys_file;
-    IMATI_STL::TriMesh* city = new IMATI_STL::TriMesh();
 
+
+    points_number = 0;
     for(unsigned int i = 0; i < boundaries.size(); i++)
     {
-        std::vector<IMATI_STL::Vertex*> shell_vertices;
-        std::vector<IMATI_STL::Triangle*> shell_triangles;
+        std::vector<unsigned int> shell_triangles;
         if(boundaries[i][0] == boundaries[i][boundaries[i].size() - 1])
             boundaries[i].pop_back();
+        unsigned int size = boundaries[i].size();
 
-        for(unsigned int j = 0; j < boundaries[i].size(); j++)
+        for(unsigned int j = 0; j < size; j++)
+            boundaries[i].push_back(Point3D(boundaries[i][j].getX(), boundaries[i][j].getY(), boundaries[i][j].getZ() + OFFSET));
+
+        points_number += boundaries[i].size();
+        for(unsigned int j = 0; j < size; j++)
         {
-            shell_vertices.push_back(city->newVertex(boundaries[i][j].getX(), boundaries[i][j].getY(), boundaries[i][j].getZ()));
-            city->V.appendTail(shell_vertices.back());
+            shell_triangles.push_back(Utilities::mod(j - 1, size));
+            shell_triangles.push_back(size + j);
+            shell_triangles.push_back(size + Utilities::mod(j - 1, size));
+
+            shell_triangles.push_back(Utilities::mod(j - 1, size));
+            shell_triangles.push_back(j);
+            shell_triangles.push_back(size + j);
         }
 
-        for(unsigned int j = 0; j < boundaries[i].size(); j++)
+        std::vector<Point3D> polygon_base(boundaries[i].begin(), boundaries[i].begin() + size);
+        std::vector<std::vector<Point3D> > polygon_base_holes;
+        TriHelper::TriangleHelper helper(polygon_base, polygon_base_holes);
+        std::vector<unsigned int> enclosing_triangles = helper.getTriangles();
+
+        for(unsigned int j = 0; j < enclosing_triangles.size() / 3; j++)
         {
-            shell_vertices.push_back(city->newVertex(boundaries[i][j].getX(), boundaries[i][j].getY(), boundaries[i][j].getZ() + OFFSET));
-            city->V.appendTail(shell_vertices.back());
+            shell_triangles.push_back(enclosing_triangles[j * 3]);
+            shell_triangles.push_back(enclosing_triangles[j * 3 + 1]);
+            shell_triangles.push_back(enclosing_triangles[j * 3 + 2]);
+
+            shell_triangles.push_back(size + enclosing_triangles[j * 3]);
+            shell_triangles.push_back(size + enclosing_triangles[j * 3 + 1]);
+            shell_triangles.push_back(size + enclosing_triangles[j * 3 + 2]);
         }
-
-        IMATI_STL::ExtVertex **var = (IMATI_STL::ExtVertex **) malloc(sizeof(IMATI_STL::ExtVertex *) * shell_vertices.size());
-        for(unsigned int j = 0; j < shell_vertices.size(); j++)
-            var[j] = new IMATI_STL::ExtVertex(shell_vertices[j]);
-        for(unsigned int j = 0; j < boundaries[i].size(); j++)
-        {
-            shell_triangles.push_back(city->CreateIndexedTriangle(var,
-                                                                  Utilities::mod(j - 1, boundaries[i].size()),
-                                                                  boundaries[i].size() + j,
-                                                                  boundaries[i].size() + Utilities::mod(j - 1, boundaries[i].size())));
-
-            shell_triangles.push_back(city->CreateIndexedTriangle(var,
-                                                                  Utilities::mod(j - 1, boundaries[i].size()),
-                                                                  j,
-                                                                  boundaries[i].size() + j));
-        }
-
-
-
-        ofstream polygon_file("a.poly");
-        if(polygon_file.is_open())
-        {
-            polygon_file << boundaries[i].size() << " 2 1 0" << std::endl;
-
-            polygon_file.precision(17);
-            for(unsigned int j = 0; j < boundaries[i].size(); j++)
-            {
-                polygon_file << j + 1 << " " << shell_vertices[j]->x << " " << shell_vertices[j]->y << std::endl;
-            }
-
-            polygon_file << boundaries[i].size() << " 0" << std::endl;
-            for(unsigned int j = 0; j < boundaries[i].size() - 1; j++)
-                    polygon_file << j + 1 << " " << j + 1 << " " << j + 2 << std::endl;
-            polygon_file << boundaries[i].size() << " " << boundaries[i].size() << " 1"<< std::endl;
-            polygon_file << "0"<< std::endl;
-            polygon_file.close();
-            std::cout << exec("./../triangle/triangle a.poly -pQ") << std::flush;
-            std::vector<unsigned int*> triangles = Utilities::ele_file_reader("a.1.ele");
-            for(unsigned int j = 0; j < triangles.size(); j++)
-            {
-                shell_triangles.push_back(city->CreateIndexedTriangle(var,
-                                                                      triangles[j][0] - 1,
-                                                                      triangles[j][1] - 1,
-                                                                      triangles[j][2] - 1));
-
-                shell_triangles.push_back(city->CreateIndexedTriangle(var,
-                                                                      boundaries[i].size() + triangles[j][0] - 1,
-                                                                      boundaries[i].size() + triangles[j][1] - 1,
-                                                                      boundaries[i].size() + triangles[j][2] - 1));
-                delete[] triangles[j];
-            }
-        }
-        if (var != nullptr)
-        {
-            for (unsigned int j = 0; j < shell_vertices.size(); j++)
-                delete var[j];
-            free(var);
-        }
+        triangles_number += shell_triangles.size();
+        triangles.push_back(shell_triangles);
     }
-    city->save("city.ply");
+
+    triangles_number /= 3;
+    for(unsigned int i = 0; i < boundaries.size(); i++)
+        for(unsigned int j = 0; j < boundaries[i].size(); j++)
+            boundaries[i][j] = boundaries[i][j] + mean;
+    ofstream city("city.ply");
+    city.precision(20);
+    if(city.is_open())
+    {
+        city << "ply" << std::endl;
+        city << "format ascii 1.0" << std::endl;
+        city << "element vertex " << points_number << std::endl;
+        city << "property double x" << std::endl;
+        city << "property double y" << std::endl;
+        city << "property double z" << std::endl;
+        city << "element face " << triangles_number <<std::endl;
+        city << "property list uchar int vertex_indices" << std::endl;
+        city << "end_header" << std::endl;
+
+        for(unsigned int i = 0; i < boundaries.size(); i++)
+            for(unsigned int j = 0; j < boundaries[i].size(); j++)
+                city << boundaries[i][j].getX() << " "  << boundaries[i][j].getY() << " "  << boundaries[i][j].getZ() << " " << std::endl;
+
+        unsigned int triangles_index_offset = 0;
+        for(unsigned int i = 0; i < triangles.size(); i++)
+        {
+            if(i > 0)
+                triangles_index_offset += boundaries[i - 1].size();
+            for(unsigned int j = 0; j < triangles[i].size() / 3; j++)
+                city << "3 " << triangles_index_offset + triangles[i][j * 3] << " "
+                             << triangles_index_offset + triangles[i][j * 3 + 1] << " "
+                             << triangles_index_offset + triangles[i][j * 3 + 2] << std::endl;
+        }
+
+        city.close();
+    }
     return 0;
 
-}
-
-std::string exec(const char* cmd) {
-    std::array<char, 128> buffer;
-    std::string result;
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
-    if (!pipe) {
-        throw std::runtime_error("popen() failed!");
-    }
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        result += buffer.data();
-    }
-    return result;
 }

@@ -8,23 +8,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 find_library(SHAPELIB shp Shp)
 find_path(SHAPELIB_H shapelib)
 set(MAIN_FOLDER ${CMAKE_SOURCE_DIR})
-set( IMATISTL ${MAIN_FOLDER}/ImatiSTL)
-set( IMATISTL_H ${IMATISTL}/include)
+set( TRIANGLE ${MAIN_FOLDER}/triangle/ )
 
+add_definitions(-DTRIANGLE_HEADER="${TRIANGLE}/triangle.h")
 
 file(GLOB IO_srcs "${MAIN_FOLDER}/include/*.h*" "${MAIN_FOLDER}/IO/*.c*")
 file(GLOB Srcs "${MAIN_FOLDER}/src/*.c*")
 
-add_subdirectory(${IMATISTL})
+add_subdirectory(${TRIANGLE})
 add_executable(${PROJECT_NAME} ${IO_srcs} ${Srcs} )
-target_link_libraries(${PROJECT_NAME} ${SHAPELIB} ImatiSTL-lib)
+target_link_libraries(${PROJECT_NAME} ${SHAPELIB} Triangle-lib)
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${MAIN_FOLDER}/include/
     ${SHAPELIB_H}
-    ${IMATISTL_H}/
-    ${IMATISTL_H}/ImatiSTL/
-    ${IMATISTL_H}/Kernel/
-    ${IMATISTL_H}/TMesh/
 )
 
 
