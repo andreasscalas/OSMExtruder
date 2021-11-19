@@ -1,12 +1,15 @@
 cmake_minimum_required(VERSION 2.8.8)
 
 project(Triangle)
+
 set( Srcs
-    ${TRIANGLE}/triangle.cpp
+    ${TRIANGLE}/shewchuk_triangle.cpp
     ${TRIANGLE}/tricall.c
+    ${TRIANGLE}/trianglehelper.cpp
 )
 set( Hdrs
-    ${TRIANGLE}/triangle.h
+    ${TRIANGLE}/shewchuk_triangle.h
+    ${TRIANGLE}/trianglehelper.h
 )
 
 add_definitions(-DTRILIBRARY -DANSI_DECLARATORS -DVOID=void -DREAL=double -DNO_TIMER=true)
