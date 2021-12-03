@@ -10,18 +10,16 @@ Edge::Edge()
     t2 = nullptr;
 }
 
-Edge::Edge(Vertex* v1, Vertex* v2)
+Edge::Edge(std::shared_ptr<Vertex> v1, std::shared_ptr<Vertex> v2)
 {
     setId(-1);
     setV1(v1);
     setV2(v2);
     t1 = nullptr;
     t2 = nullptr;
-    v1->setE0(this);
-    v2->setE0(this);
 }
 
-Edge::Edge(Edge* e)
+Edge::Edge(std::shared_ptr<Edge> e)
 {
     setId(e->getId());
     setV1(e->getV1());
@@ -34,55 +32,30 @@ Edge::Edge(Edge* e)
 
 Edge::~Edge()
 {
-    if(v1 != nullptr && v1->getE0() == this)
-    {
-        std::vector<Edge*> ve = v1->getVE();
-        unsigned int i = 0;
-        while(ve.at(i) == this) i++;
-        v1->setE0(ve.at(i));
-    }
-    if(v2 != nullptr && v2->getE0() == this)
-    {
-        std::vector<Edge*> ve = v2->getVE();
-        unsigned int i = 0;
-        while(ve.at(i) == this) i++;
-        v2->setE0(ve.at(i));
-    }
-    if(t1 != nullptr)
-        if(t1->getE1() == this)
-            t1->setE1(nullptr);
-        else if(t1->getE2() == this)
-            t1->setE2(nullptr);
-        else if(t1->getE3() == this)
-            t1->setE3(nullptr);
-
-    if(t2 != nullptr)
-        if(t2->getE1() == this)
-            t2->setE1(nullptr);
-        else if(t2->getE2() == this)
-            t2->setE2(nullptr);
-        else if(t2->getE3() == this)
-            t2->setE3(nullptr);
+    v1.reset();
+    v2.reset();
+    t1.reset();
+    t2.reset();
 
 
 }
 
-Vertex* Edge::getV1() const
+std::shared_ptr<Vertex> Edge::getV1() const
 {
     return v1;
 }
 
-void Edge::setV1(Vertex* newV1)
+void Edge::setV1(std::shared_ptr<Vertex> newV1)
 {
     v1 = newV1;
 }
 
-Vertex* Edge::getV2() const
+std::shared_ptr<Vertex> Edge::getV2() const
 {
     return v2;
 }
 
-void Edge::setV2(Vertex* newV2)
+void Edge::setV2(std::shared_ptr<Vertex> newV2)
 {
     v2 = newV2;
 }
@@ -107,7 +80,7 @@ void Edge::setAssociatedFlags(const std::vector<FlagType> &newAssociatedFlags)
     associated_flags = newAssociatedFlags;
 }
 
-Vertex* Edge::getCommonVertex(Edge* e)
+std::shared_ptr<Vertex> Edge::getCommonVertex(std::shared_ptr<Edge> e)
 {
     if(e->hasVertex(v1))
         return v1;
@@ -117,28 +90,28 @@ Vertex* Edge::getCommonVertex(Edge* e)
 
 }
 
-Vertex* Edge::getOppositeVertex(Vertex* v)
+std::shared_ptr<Vertex> Edge::getOppositeVertex(std::shared_ptr<Vertex> v)
 {
-    if(v1 == v)
+    if(v1 != nullptr && v1->getId() == v->getId())
         return v2;
-    if(v2 != nullptr && v2 == v)
+    if(v2 != nullptr && v2->getId() == v->getId())
         return v1;
 
     return nullptr;
 }
 
-Triangle* Edge::getLeftTriangle(Vertex*  v)
+std::shared_ptr<Triangle> Edge::getLeftTriangle(std::shared_ptr<Vertex>  v)
 {
-    Vertex* v_;
-    if(v1 == v)
+    std::shared_ptr<Vertex> v_;
+    if(v1 != nullptr && v1->getId() == v->getId())
         v_ = v2;
-    else if(v2 == v)
+    else if(v2 != nullptr && v2->getId() == v->getId())
         v_ = v1;
     else
         return nullptr;
     if(t1 != nullptr)
     {
-        Vertex* v__ = t1->getOppositeVertex(this);
+        std::shared_ptr<Vertex> v__ = t1->getOppositeVertex(std::make_shared<Edge>(*this));
         Point vec1 = *v_ - *v;
         Point vec2 = *v__ - *v;
         Point cross = vec1 & vec2;
@@ -150,7 +123,7 @@ Triangle* Edge::getLeftTriangle(Vertex*  v)
     }
     if(t2 != nullptr)
     {
-        Vertex* v__ = t2->getOppositeVertex(this);
+        std::shared_ptr<Vertex> v__ = t2->getOppositeVertex(std::make_shared<Edge>(*this));
         Point vec1 = *v_ - *v;
         Point vec2 = *v__ - *v;
         Point cross = vec1 & vec2;
@@ -163,18 +136,18 @@ Triangle* Edge::getLeftTriangle(Vertex*  v)
     return nullptr;
 }
 
-Triangle* Edge::getRightTriangle(Vertex*  v)
+std::shared_ptr<Triangle> Edge::getRightTriangle(std::shared_ptr<Vertex>  v)
 {
-    Vertex* v_;
-    if(v1 == v)
+    std::shared_ptr<Vertex> v_;
+    if(v1 != nullptr && v1->getId() == v->getId())
         v_ = v2;
-    else if(v2 == v)
+    else if(v2 != nullptr && v2->getId() == v->getId())
         v_ = v1;
     else
         return nullptr;
     if(t1 != nullptr)
     {
-        Vertex* v__ = t1->getOppositeVertex(this);
+        std::shared_ptr<Vertex> v__ = t1->getOppositeVertex(std::make_shared<Edge>(*this));
         Point vec1 = *v_ - *v;
         Point vec2 = *v__ - *v;
         Point cross = vec1 & vec2;
@@ -186,7 +159,7 @@ Triangle* Edge::getRightTriangle(Vertex*  v)
     }
     if(t2 != nullptr)
     {
-        Vertex* v__ = t2->getOppositeVertex(this);
+        std::shared_ptr<Vertex> v__ = t2->getOppositeVertex(std::make_shared<Edge>(*this));
         Point vec1 = *v_ - *v;
         Point vec2 = *v__ - *v;
         Point cross = vec1 & vec2;
@@ -199,28 +172,28 @@ Triangle* Edge::getRightTriangle(Vertex*  v)
     return nullptr;
 }
 
-bool Edge::hasVertex(Vertex*  v)
+bool Edge::hasVertex(std::shared_ptr<Vertex>  v)
 {
-    return (v1 == v || v2 == v);
+    return ((v1 != nullptr && v1->getId() == v->getId()) || (v2 != nullptr && v2->getId() == v->getId()));
 }
 
 
-Triangle* Edge::getT1() const
+std::shared_ptr<Triangle> Edge::getT1() const
 {
     return t1;
 }
 
-void Edge::setT1(Triangle* newT1)
+void Edge::setT1(std::shared_ptr<Triangle> newT1)
 {
     t1 = newT1;
 }
 
-Triangle* Edge::getT2() const
+std::shared_ptr<Triangle> Edge::getT2() const
 {
     return t2;
 }
 
-void Edge::setT2(Triangle* newT2)
+void Edge::setT2(std::shared_ptr<Triangle> newT2)
 {
     t2 = newT2;
 }

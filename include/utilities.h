@@ -1,6 +1,12 @@
 
+#include "coordsconverter.h"
+#include "osmway.h"
+
 #include <TriangleMesh.h>
+#include <osmnode.h>
+#include <osmrelation.h>
 #include <shapefil.h>
+#include <tinyxml2.h>
 
 #include <fstream>
 #include <vector>
@@ -15,8 +21,6 @@
 #include <KDTreeVectorOfVectorsAdaptor.h>
 
 namespace Utilities {
-
-//    std::ofstream file("prova.txt");
 
     typedef std::vector<std::vector<double> > my_vector_of_vectors_t;
     typedef KDTreeVectorOfVectorsAdaptor< my_vector_of_vectors_t, double > my_kd_tree_t;
@@ -39,13 +43,260 @@ namespace Utilities {
         IOERROR
     };
 
+    int loadOSM(std::string filename, std::vector<std::shared_ptr<OSMNode> > &nodes, std::vector<std::shared_ptr<OSMWay> > &ways, std::vector<std::shared_ptr<OSMRelation> > &relations)
+    {
+        tinyxml2::XMLDocument document;
+        document.LoadFile(filename.c_str());
+
+        tinyxml2::XMLElement* osmRoot = document.FirstChildElement();
+        tinyxml2::XMLElement* xmlNode = osmRoot->FirstChildElement("node");
+        std::map<unsigned int, unsigned int> osmid_pos;
+        unsigned int counter = 0;
+        CoordsConverter converter(32633);
+
+        while(xmlNode != NULL){
+
+            char *value;
+            std::shared_ptr<OSMNode> node = std::make_shared<OSMNode>();
+            std::vector<std::pair<std::string, std::string> > tags;
+            const char* id = xmlNode->Attribute("id");
+            if(id == NULL)
+                return -1;
+            node->setId(id);
+            osmid_pos.insert(std::make_pair(atoi(id), counter++));
+            const char* userName = xmlNode->Attribute("user");
+            if(userName == NULL)
+                return -2;
+            node->setUserName(userName);
+            const char* userId = xmlNode->Attribute("uid");
+            if(userId == NULL)
+                return -3;
+            node->setUserId(userId);
+            const char* latitude = xmlNode->Attribute("lat");
+            const char* longitude = xmlNode->Attribute("lon");
+            if(latitude == NULL || longitude == NULL)
+                return -4;
+
+
+            double lat = strtod(latitude, NULL), lon = strtod(longitude, NULL), x, y;
+            converter.convertToUTM(lat, lon, x, y);
+            std::shared_ptr<Point> coordinates = std::make_shared<Point>(x, y, 0);
+            coordinates->setInfo(static_cast<void*>(node.get()));
+            node->setCoordinates(coordinates);
+
+            const char* isVisible = xmlNode->Attribute("visible");
+            if(isVisible == NULL)
+                return -5;
+            node->setIsVisible(strcmp(isVisible, "true") == 0);
+
+            const char* version = xmlNode->Attribute("version");
+            if(version == NULL)
+                return -6;
+            node->setVersion(version);
+
+            const char* changeset = xmlNode->Attribute("changeset");
+            if(changeset == NULL)
+                return -7;
+            node->setChangeset(changeset);
+
+
+            const char* timestamp = xmlNode->Attribute("timestamp");
+            if(timestamp == NULL)
+                return -8;
+            node->setTimestamp(timestamp);
+
+            tinyxml2::XMLElement* xmlTag = xmlNode->FirstChildElement("tag");
+            while(xmlTag != NULL){
+                const char* key = xmlTag->Attribute("k");
+                const char* value = xmlTag->Attribute("v");
+                if(key == NULL || value == NULL)
+                    return -8;
+
+                tags.push_back(std::make_pair(key, value));
+                xmlTag = xmlTag->NextSiblingElement("tag");
+            }
+
+            node->setTags(tags);
+            xmlNode = xmlNode->NextSiblingElement("node");
+
+            nodes.push_back(node);
+        }
+
+        tinyxml2::XMLElement* xmlWay = osmRoot->FirstChildElement("way");
+        counter = 0;
+
+        while(xmlWay != NULL){
+
+            char *value;
+            std::shared_ptr<OSMWay> way = std::make_shared<OSMWay>();
+            std::vector<std::pair<std::string, std::string> > tags;
+            std::vector<std::shared_ptr<OSMNode> > connected;
+            const char* id = xmlWay->Attribute("id");
+            if(id == NULL)
+                return -9;
+            way->setId(id);
+            osmid_pos.insert(std::make_pair(atoi(id), counter++));
+            const char* userName = xmlWay->Attribute("user");
+            if(userName == NULL)
+                return -10;
+            way->setUserName(userName);
+            const char* userId = xmlWay->Attribute("uid");
+            if(userId == NULL)
+                return -11;
+            way->setUserId(userId);
+
+            const char* isVisible = xmlWay->Attribute("visible");
+            if(isVisible == NULL)
+                return -12;
+            way->setIsVisible(strcmp(isVisible, "true") == 0);
+
+            const char* version = xmlWay->Attribute("version");
+            if(version == NULL)
+                return -13;
+            way->setVersion(version);
+
+            const char* changeset = xmlWay->Attribute("changeset");
+            if(changeset == NULL)
+                return -14;
+            way->setChangeset(changeset);
+
+            const char* timestamp = xmlWay->Attribute("timestamp");
+            if(timestamp == NULL)
+                return -15;
+            way->setTimestamp(timestamp);
+
+            tinyxml2::XMLElement* xmlConnected = xmlWay->FirstChildElement("nd");
+            while(xmlConnected != NULL){
+                const char* ref = xmlConnected->Attribute("ref");
+                if(ref == NULL)
+                    return -16;
+
+                connected.push_back(nodes.at(osmid_pos.at(atoi(ref))));
+                xmlConnected = xmlConnected->NextSiblingElement("nd");
+            }
+
+            way->setNodes(connected);
+            tinyxml2::XMLElement* xmlTag = xmlWay->FirstChildElement("tag");
+            while(xmlTag != NULL){
+                const char* key = xmlTag->Attribute("k");
+                const char* value = xmlTag->Attribute("v");
+                if(key == NULL || value == NULL)
+                    return -17;
+
+                tags.push_back(std::make_pair(key, value));
+                xmlTag = xmlTag->NextSiblingElement("tag");
+            }
+
+            way->setTags(tags);
+            xmlWay = xmlWay->NextSiblingElement("way");
+
+            ways.push_back(way);
+        }
+
+
+        tinyxml2::XMLElement* xmlRelation = osmRoot->FirstChildElement("relation");
+        counter = 0;
+
+        while(xmlRelation != NULL){
+
+            char *value;
+            std::shared_ptr<OSMRelation> relation = std::make_shared<OSMRelation>();
+            std::vector<std::pair<std::string, std::string> > tags;
+            const char* id = xmlRelation->Attribute("id");
+            if(id == NULL)
+                return -18;
+            relation->setId(id);
+            osmid_pos.insert(std::make_pair(atoi(id), counter++));
+            const char* userName = xmlRelation->Attribute("user");
+            if(userName == NULL)
+                return -19;
+            relation->setUserName(userName);
+            const char* userId = xmlRelation->Attribute("uid");
+            if(userId == NULL)
+                return -20;
+            relation->setUserId(userId);
+
+            const char* isVisible = xmlRelation->Attribute("visible");
+            if(isVisible == NULL)
+                return -21;
+            relation->setIsVisible(strcmp(isVisible, "true") == 0);
+
+            const char* version = xmlRelation->Attribute("version");
+            if(version == NULL)
+                return -22;
+            relation->setVersion(version);
+
+            const char* changeset = xmlRelation->Attribute("changeset");
+            if(changeset == NULL)
+                return -23;
+            relation->setChangeset(changeset);
+
+            const char* timestamp = xmlRelation->Attribute("timestamp");
+            if(timestamp == NULL)
+                return -24;
+            relation->setTimestamp(timestamp);
+
+            tinyxml2::XMLElement* xmlConnected = xmlRelation->FirstChildElement("member");
+            while(xmlConnected != NULL){
+                const char* type = xmlConnected->Attribute("type");
+                const char* member_ref = xmlConnected->Attribute("ref");
+                const char* role_pointer = xmlConnected->Attribute("role");
+                if(type == NULL || member_ref == NULL || role_pointer == NULL)
+                    return -25;
+                std::string role(role_pointer);
+
+                relation->setType(type);
+                if(strcmp(type, "node") == 0)
+                    if(osmid_pos.find(atoi(member_ref)) != osmid_pos.end())
+                        relation->addNode(std::make_pair(nodes.at(osmid_pos.at(atoi(member_ref))), role));
+                    else
+                        relation->addNode(std::make_pair(nullptr, role));
+                else if(strcmp(type, "way") == 0)
+                    if(osmid_pos.find(atoi(member_ref)) != osmid_pos.end())
+                        relation->addWay(std::make_pair(ways.at(osmid_pos.at(atoi(member_ref))), role));
+                    else
+                        relation->addWay(std::make_pair(nullptr, role));
+                else if(strcmp(type, "relation") == 0)
+                    if(osmid_pos.find(atoi(member_ref)) != osmid_pos.end())
+                    {
+                        relation->addRelation(std::make_pair(relations.at(osmid_pos.at(atoi(member_ref))), role));
+                    } else
+                    {
+                        relation->addRelation(std::make_pair(nullptr, role));
+                    }
+                else
+                    return -26;
+
+                xmlConnected = xmlConnected->NextSiblingElement("members");
+            }
+
+
+            tinyxml2::XMLElement* xmlTag = xmlRelation->FirstChildElement("tag");
+            while(xmlTag != NULL){
+                const char* key = xmlTag->Attribute("k");
+                const char* value = xmlTag->Attribute("v");
+                if(key == NULL || value == NULL)
+                    return -27;
+
+                tags.push_back(std::make_pair(key, value));
+                xmlTag = xmlTag->NextSiblingElement("tag");
+            }
+
+            relation->setTags(tags);
+            xmlRelation = xmlRelation->NextSiblingElement("relation");
+
+            relations.push_back(relation);
+        }
+
+        return 0;
+    }
     /**
      * @brief load_shapefile_shp reader di shapefile (per gentile concessione di Daniela)
      * @param filename il nome (path + nome) dello shapefile
      * @param boundaries vettore che fa da contenitore ai poligoni nello shapefile
      * @return codice d'errore
      */
-    int load_shapefile_shp(const std::string filename, std::vector<std::vector<Point*>> &boundaries)
+    int load_shapefile_shp(const std::string filename, std::vector<std::vector<std::shared_ptr<Point> >> &boundaries)
     {
         boundaries.clear();
 
@@ -73,11 +324,14 @@ namespace Utilities {
         {
             SHPObject *obj = SHPReadObject(hSHP, i);
 
-            boundaries.push_back(std::vector<Point*> ());
+            boundaries.push_back(std::vector<std::shared_ptr<Point> > ());
 
-            for (int j = 0; j < (obj->nVertices - 1); ++j)
+            unsigned int size = obj->nVertices;
+            if(nShapeType == SHPT_POLYGON || nShapeType == SHPT_POLYGONZ)
+                size--;
+            for (int j = 0; j < size; ++j)
             {
-                Point* point = new Point(obj->padfX[j], obj->padfY[j], obj->padfZ[j]);
+                std::shared_ptr<Point> point = std::make_shared<Point>(obj->padfX[j], obj->padfY[j], obj->padfZ[j]);
                 if(j > 0 && *point == *boundaries.at(boundaries.size()-1).at(0))
                     break;
                 boundaries.at(boundaries.size() - 1).push_back(point);
@@ -98,7 +352,7 @@ namespace Utilities {
      * @param points vettore che fa da contenitore ai punti della nuvola
      * @return codice d'errore
      */
-//    int load_xyz_file(const std::string filename, std::vector<Point*> &points)
+//    int load_xyz_file(const std::string filename, std::vector<std::shared_ptr<Point> > &points)
 //    {
 //        points.clear();
 //        std::ifstream file_stream(filename);
@@ -134,9 +388,9 @@ namespace Utilities {
 //    }
 
 
-    std::vector<Point*>::iterator findPointInList(std::vector<Point*>::iterator begin, std::vector<Point*>::iterator end, Point* p)
+    std::vector<std::shared_ptr<Point> >::iterator findPointInList(std::vector<std::shared_ptr<Point> >::iterator begin, std::vector<std::shared_ptr<Point> >::iterator end, std::shared_ptr<Point> p)
     {
-        for(std::vector<Point*>::iterator it = begin; it != end; it++)
+        for(std::vector<std::shared_ptr<Point> >::iterator it = begin; it != end; it++)
             if(**it == *p)
                 return it;
         return end;
@@ -146,22 +400,22 @@ namespace Utilities {
      * @brief fix_polygon pulisce un poligono da vertici doppi e spikes.
      * @param boundary il poligono
      */
-    void fix_polygon(std::vector<Point*> &boundary)
+    void fix_polygon(std::vector<std::shared_ptr<Point> > &boundary)
     {
         for (unsigned int i = 0; i < boundary.size() - 1; i++) {
 
             while(i < boundary.size() - 1 && (*boundary[i]) == (*boundary[i + 1]))
             {
-                Point* tmp = boundary.at(i + 1);
+                std::shared_ptr<Point> tmp = boundary.at(i + 1);
                 boundary.erase(boundary.begin() + i + 1);
-                delete tmp;
+                tmp.reset();
             }
 
-            std::vector<Point*>::iterator it = findPointInList(boundary.begin() + i + 1, boundary.end(), boundary[i]);
+            std::vector<std::shared_ptr<Point> >::iterator it = findPointInList(boundary.begin() + i + 1, boundary.end(), boundary[i]);
             while(it != boundary.end())
             {
-                for(std::vector<Point*>::iterator it1 = boundary.begin() + i + 1; it1 <= it; it1++)
-                    delete *it1;
+                for(std::vector<std::shared_ptr<Point> >::iterator it1 = boundary.begin() + i + 1; it1 <= it; it1++)
+                    it1->reset();
                 boundary.erase(boundary.begin() + i + 1, it + 1);
                 it = findPointInList(boundary.begin() + i + 1, boundary.end(), boundary[i]);
             }
@@ -170,7 +424,7 @@ namespace Utilities {
                 if((*boundary[i]) == (*boundary[0]))
                 {
                     for(unsigned int j = i + 1; j < boundary.size(); j++)
-                        delete boundary.at(j);
+                        boundary.at(j).reset();
                     boundary.erase(boundary.begin() + i + 1, boundary.end());
                 }
             }
@@ -180,22 +434,22 @@ namespace Utilities {
 
     }
 
-    void fix_line(std::vector<Point*> &line)
+    void fix_line(std::vector<std::shared_ptr<Point> > &line)
     {
         for (int i = 0; i < static_cast<int>(line.size()) - 1; i++) {
 
             while(i < line.size() - 1 && (*line[i]) == (*line[i + 1]))
             {
-                Point* tmp = line.at(i + 1);
+                std::shared_ptr<Point> tmp = line.at(i + 1);
                 line.erase(line.begin() + i + 1);
-                delete tmp;
+                tmp.reset();
             }
 
-            std::vector<Point*>::iterator it = findPointInList(line.begin() + i + 1, line.end(), line[i]);
+            std::vector<std::shared_ptr<Point> >::iterator it = findPointInList(line.begin() + i + 1, line.end(), line[i]);
             while(it != line.end())
             {
-                for(std::vector<Point*>::iterator it1 = line.begin() + i + 1; it1 <= it; it1++)
-                    delete *it1;
+                for(std::vector<std::shared_ptr<Point> >::iterator it1 = line.begin() + i + 1; it1 <= it; it1++)
+                    it1->reset();
                 line.erase(line.begin() + i + 1, it + 1);
                 it = findPointInList(line.begin() + i + 1, line.end(), line[i]);
             }
@@ -244,7 +498,7 @@ namespace Utilities {
      * @param pout il punto di intersezione (per riferimento)
      * @return true se i segmenti si intersecano, false altrimenti
      */
-    bool segmentsIntersection(Point* p1, Point* p2, Point* p3, Point* p4, Point &pout)
+    bool segmentsIntersection(std::shared_ptr<Point> p1, std::shared_ptr<Point> p2, std::shared_ptr<Point> p3, std::shared_ptr<Point> p4, Point &pout)
     {
 
         double detL1 = det(p1->getX(), p1->getY(), p2->getX(), p2->getY());
@@ -271,7 +525,7 @@ namespace Utilities {
         if(!isfinite(pout.getX()) || !isfinite(pout.getY())) //Probably a numerical issue
             return false;
 
-        bool result = isPointInSegment(p1, p2, &pout) && isPointInSegment(p3, p4, &pout);
+        bool result = isPointInSegment(p1.get(), p2.get(), &pout) && isPointInSegment(p3.get(), p4.get(), &pout);
         return result;
 
     }
@@ -282,7 +536,7 @@ namespace Utilities {
      * @param polygon2 poligono numero 2
      * @return true se i poligoni si intersecano, false altrimenti
      */
-    bool polygonsIntersect(std::vector<Point*> polygon1, std::vector<Point*> polygon2)
+    bool polygonsIntersect(std::vector<std::shared_ptr<Point> > polygon1, std::vector<std::shared_ptr<Point> > polygon2)
     {
         for(unsigned int i = 1; i < polygon1.size(); i++)
         {
@@ -327,13 +581,13 @@ namespace Utilities {
      * @param points il poligono
      * @return array di 4 elementi (5 in realtà, il primo e l'ultimo sono uguali) codificante la AABB. Seguo questa codifica per compatibilità con gli altri poligoni.
      */
-    std::vector<Point*> bbExtraction(std::vector<Point*> points)
+    std::vector<std::shared_ptr<Point> > bbExtraction(std::vector<std::shared_ptr<Point> > points)
     {
-        std::vector<Point*> bb;
-        bb.push_back(new Point(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), 0));
-        bb.push_back(new Point(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), 0));
-        bb.push_back(new Point(-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), 0));
-        bb.push_back(new Point(std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), 0));
+        std::vector<std::shared_ptr<Point> > bb;
+        bb.push_back(std::make_shared<Point>(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), 0));
+        bb.push_back(std::make_shared<Point>(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), 0));
+        bb.push_back(std::make_shared<Point>(-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), 0));
+        bb.push_back(std::make_shared<Point>(std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), 0));
 
         for(unsigned int j = 0; j < points.size(); j++)
         {
@@ -368,7 +622,7 @@ namespace Utilities {
      * @brief mergeTouchingPolygons metodo per fondere poligoni a contatto. Correntemente non in funzione
      * @param boundaries insieme dei poligoni
      */
-    void mergeTouchingPolygons(std::vector<std::vector<Point*> > &boundaries)
+    void mergeTouchingPolygons(std::vector<std::vector<std::shared_ptr<Point> > > &boundaries)
     {
         using namespace boost::geometry;
 
@@ -377,12 +631,12 @@ namespace Utilities {
         typedef model::box<point_2d> box_2d;
         for(int i = 0; i < boundaries.size(); i++)
         {
-            std::vector<Point*> bb1 = bbExtraction(boundaries[i]);
+            std::vector<std::shared_ptr<Point> > bb1 = bbExtraction(boundaries[i]);
             for(int j = 0; j < boundaries.size(); j++)
             {
                 if(i == j)
                     continue;
-                std::vector<Point*> bb2 = bbExtraction(boundaries[j]);
+                std::vector<std::shared_ptr<Point> > bb2 = bbExtraction(boundaries[j]);
                 if(polygonsIntersect(bb1, bb2)){
 
                     if(polygonsIntersect(boundaries[i], boundaries[j]))
@@ -413,12 +667,12 @@ namespace Utilities {
                         for(unsigned int k = 0; k < output[0].outer().size(); k++)
                         {
                             point_2d tmp = output[0].outer()[k];
-                            boundaries.at(i).push_back(new Point(tmp.x(), tmp.y(), 0));
+                            boundaries.at(i).push_back(std::make_shared<Point>(tmp.x(), tmp.y(), 0));
                         }
 
-                        Point* tmp = boundaries.at(i).at(j);
+                        std::shared_ptr<Point> tmp = boundaries.at(i).at(j);
                         boundaries.at(i).erase(boundaries.at(i).begin() + j);
-                        delete tmp;
+                        tmp.reset();
                         if(i > j) i--;
                         break;
 
@@ -426,15 +680,15 @@ namespace Utilities {
 
                 }
                 for(unsigned int k = 0; k < 4; k++)
-                    delete bb2[k];
+                    bb2[k].reset();
             }
 
             for(unsigned int j = 0; j < 4; j++)
-                delete bb1[j];
+                bb1[j].reset();
         }
     }
 
-    void fix_polygons(std::vector<std::vector<Point*> > &boundaries)
+    void fix_polygons(std::vector<std::vector<std::shared_ptr<Point> > > &boundaries)
     {
 
         for (unsigned int i = 0; i < boundaries.size(); i++) {
@@ -443,109 +697,31 @@ namespace Utilities {
             fix_polygon(boundaries[i]);
             if(boundaries[i].size() < 4){
                 for(unsigned int j = 0; j < boundaries[i].size() - 1; j++)
-                    delete boundaries.at(i).at(j);
+                    boundaries.at(i).at(j).reset();
                 boundaries.erase(boundaries.begin() + i);
                 i--;
             }
 
-            /*for (unsigned int j = 0; i < boundaries[i].size() - 1; j++)
-                while(boundaries[i].size() > j && boundaries[i][j] == boundaries[i][j + 1])
-                {
-                    std::vector<Point3D>::iterator it = boundaries[i].begin() + j + 1;
-                    boundaries[i].erase(it);
-                }
-            std::stringstream wkt;
-
-            wkt << "POLYGON((";
-            for(unsigned int j = 0; j < boundaries[i].size() - 1; j++)
-            {
-                wkt << boundaries[i][j].getX() << " "  << boundaries[i][j].getY();
-                if(j < boundaries[i].size() - 2)
-                    wkt << ",";
-                else
-                    wkt << "))";
-
-            }
-            OGRGeometry *geometry;
-            std::string input = wkt.str();
-            const char* inputWKT = input.c_str();
-            OGRErr err = OGRGeometryFactory::createFromWkt(&inputWKT, NULL, &geometry);
-            PolygonRepair prepair;
-            if (err != OGRERR_NONE) {
-                switch (err) {
-                  case OGRERR_UNSUPPORTED_GEOMETRY_TYPE:
-                    std::cerr << "Error: geometry must be Polygon or MultiPolygon" << std::endl;
-                    break;
-                  case OGRERR_NOT_ENOUGH_DATA:
-                  case OGRERR_CORRUPT_DATA:
-                    std::cerr << "Error: corrupted input" << std::endl;
-                    break;
-                  default:
-                    std::cerr << "Error: corrupted input" << std::endl;
-                    break;
-                }
-                return;
-            }
-            if (geometry->IsEmpty() == 1) {
-                std::cerr << "Error: empty geometry" << std::endl;
-                return;
-            }
-            if ( (geometry->getGeometryType() != wkbPolygon) &&
-                   (geometry->getGeometryType() != wkbMultiPolygon) ) {
-                std::cerr << "Error: geometry must be Polygon or MultiPolygon" << std::endl;
-                return;
-            }
-
-            boundaries.erase(boundaries.begin() + i);
-            OGRMultiPolygon *outPolygons;
-
-            time_t startTime = time(NULL);
-            startTime = 0;
-            outPolygons = prepair.repairOddEven(geometry, startTime);
-            for (unsigned int j = 0; j < outPolygons->getNumGeometries(); ++j)
-            {
-                OGRPolygon* ogr_polygon;
-                ogr_polygon = static_cast<OGRPolygon*>(outPolygons->getGeometryRef(j));
-                OGRLinearRing* boundary = ogr_polygon->getExteriorRing();
-                std::vector<Point3D> newBoundary;
-                for(unsigned int k = 0; k < boundary->getNumPoints(); k++)
-                {
-                    Point3D p;
-                    p.setX(boundary->getX(k));
-                    p.setY(boundary->getY(k));
-                    p.setZ(boundary->getZ(k));
-                    newBoundary.push_back(p);
-                }
-                if(newBoundary.size() < 4)
-                    continue;
-                boundaries.insert(boundaries.begin() + i, newBoundary);
-                i++;
-            }
-            i--;*/
-
-
         }
     }
 
-    void fix_lines(std::vector<std::vector<Point*> > &boundaries)
+    void fix_lines(std::vector<std::vector<std::shared_ptr<Point> > > &lines)
     {
 
-        for (unsigned int i = 0; i < boundaries.size(); i++) {
+        for (unsigned int i = 0; i < lines.size(); i++) {
             //First run: remove repeated vertices (successive pairs)
 
-            fix_line(boundaries[i]);
-
-            if(boundaries.at(i).size() < 2)
+            fix_line(lines[i]);
+            if(lines.at(i).size() < 1)
             {
-                for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
-                    delete boundaries.at(i).at(j);
-                boundaries.erase(boundaries.begin() + i);
+                lines.erase(lines.begin() + i);
                 i--;
             }
+
         }
     }
 
-    bool isPointInsidePolygon(Point* v, std::vector<Point*> boundary){
+    bool isPointInsidePolygon(std::shared_ptr<Point> v, std::vector<std::shared_ptr<Point> > boundary){
 
         unsigned int c = 0;
         boundary.push_back(boundary.at(0));
@@ -558,7 +734,7 @@ namespace Utilities {
         return c;
     }
 
-    bool isPolygonInsidePolygon(std::vector<Point*> boundary1, std::vector<Point*> boundary2){
+    bool isPolygonInsidePolygon(std::vector<std::shared_ptr<Point> > boundary1, std::vector<std::shared_ptr<Point> > boundary2){
 
         return isPointInsidePolygon(boundary1[0], boundary2);
     }
@@ -570,7 +746,7 @@ namespace Utilities {
      * @param dhm_tiff
      * @return
      */
-    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights(std::vector<std::vector<Point*> > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
+    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights(std::vector<std::vector<std::shared_ptr<Point> > > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
     {
         std::vector<std::vector<std::pair<unsigned int, unsigned int> > > heights;
         unsigned int counter = 0;
@@ -589,17 +765,17 @@ namespace Utilities {
         #pragma omp parallel for num_threads(31)
         for(unsigned int i = 0; i < boundaries.size(); i++)
         {
-            std::vector<Point*> bb = bbExtraction(boundaries[i]);
+            std::vector<std::shared_ptr<Point> > bb = bbExtraction(boundaries[i]);
             for(unsigned int j = 0; j < dhm_tiff->GetDimensions()[0]; j++)
                 for(unsigned int k = 0; k < dhm_tiff->GetDimensions()[1]; k++)
                 {
                     double min_x = geoTransform[0] + k * geoTransform[1] + j * geoTransform[2];
                     double min_y = geoTransform[3] + k * geoTransform[4] + j * geoTransform[5];
-                    std::vector<Point*> frame;
-                    frame.push_back(new Point(min_x, min_y, 0));
-                    frame.push_back(new Point(min_x + geoTransform[1], min_y, 0));
-                    frame.push_back(new Point(frame.back()->getX(), min_y + geoTransform[5], 0));
-                    frame.push_back(new Point(min_x, frame.back()->getY(), 0));
+                    std::vector<std::shared_ptr<Point> > frame;
+                    frame.push_back(std::make_shared<Point>(min_x, min_y, 0));
+                    frame.push_back(std::make_shared<Point>(min_x + geoTransform[1], min_y, 0));
+                    frame.push_back(std::make_shared<Point>(frame.back()->getX(), min_y + geoTransform[5], 0));
+                    frame.push_back(std::make_shared<Point>(min_x, frame.back()->getY(), 0));
                     frame.push_back(frame[0]);
                     if(((*frame[0]) - (*boundaries[i][0])).norm() < std::max(((*bb[0]) - (*bb[2])).norm(), ((*frame[0]) - (*frame[2])).norm()))
                     {
@@ -612,16 +788,22 @@ namespace Utilities {
                     }
 
                     for(unsigned int l = 0; l < 4; l++)
-                        delete frame.at(l);
+                        frame.at(l).reset();
 
 
                 }
-            if(heights[i].size() == 0)
+
+            #pragma omp critical
             {
-                std::cerr << "Impossible case: boundary does not include any pixel while no pixel wholly include the boundary and boundary intersects no pixel";
-                for(unsigned int j = 0; j < boundaries[i].size(); j++)
-                    boundaries[i][j]->print(std::cerr);
-                exit(6);
+                if(heights[i].size() == 0)
+                {
+                        std::cerr << "Impossible case: boundary does not include any pixel while no pixel wholly include the boundary and boundary intersects no pixel" << std::endl;
+                        std::cerr << geoTransform[0] << " " << geoTransform[1] << " " << geoTransform[2] << " " << std::endl;
+                        std::cerr << geoTransform[3] << " " << geoTransform[4] << " " << geoTransform[5] << " " << std::endl << std::flush;
+                        for(unsigned int j = 0; j < boundaries[i].size(); j++)
+                            boundaries[i][j]->print(std::cerr);
+                        exit(6);
+                }
             }
             #pragma omp critical
             {
@@ -645,10 +827,11 @@ namespace Utilities {
      * @param dhm_tiff
      * @return
      */
-    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights1(std::vector<std::vector<Point*> > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
+    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights1(std::vector<std::vector<std::shared_ptr<Point> > > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
     {
         std::vector<std::vector<std::pair<unsigned int, unsigned int> > > heights;
         unsigned int counter = 0;
+        std::map<unsigned int, std::pair<unsigned int, unsigned int> > index_to_rowcol;
         for(unsigned int i = 0; i < boundaries.size(); i++)
         {
             std::vector<std::pair<unsigned int, unsigned int> > boundary_heights;
@@ -670,15 +853,26 @@ namespace Utilities {
                                               geoTransform[3] + j * geoTransform[4] + i * geoTransform[5],
                                               0};
                 points_vector.push_back(point);
+                index_to_rowcol.insert(std::make_pair(counter++, std::make_pair(i,j)));
             }
         }
         my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
         mat_index->index->buildIndex();
+        for(unsigned int i = 0; i < boundaries.at(0).size(); i++)
+        {
+            double query_point[3] = {boundaries.at(0).at(i)->getX(), boundaries.at(0).at(i)->getY(), 0};
+            std::vector<size_t> ret_index(1);
+            std::vector<double> out_dist_sqr(1);
+            mat_index->index->knnSearch(query_point, 1, &ret_index[0], &out_dist_sqr[0]);
+            heights.at(0).push_back(index_to_rowcol.at(ret_index[0]));
+        }
+
+        counter = 0;
 
         #pragma omp parallel for num_threads(31)
-        for(unsigned int i = 0; i < boundaries.size(); i++)
+        for(unsigned int i = 1; i < boundaries.size(); i++)
         {
-            std::vector<Point*> bb = bbExtraction(boundaries[i]);
+            std::vector<std::shared_ptr<Point> > bb = bbExtraction(boundaries[i]);
             double sphere_radius = std::max(pixel_diagonal_length, ((*bb[0]) - (*bb[2])).norm()) / 2;
             Point middle = ((*bb[0]) + (*bb[1]) + (*bb[2]) + (*bb[3])) / 4;
 
@@ -689,17 +883,19 @@ namespace Utilities {
             mat_index->index->radiusSearch(query_point, sphere_radius, neighbors_distances, params);
             for(std::vector<std::pair<size_t,double> >::iterator it = neighbors_distances.begin(); it != neighbors_distances.end(); it++){
                 std::pair<size_t, double> p = static_cast<std::pair<long int, double> >(*it);
-                neighbors.push_back(std::make_pair(p.first / dhm_tiff->GetDimensions()[0], p.first % dhm_tiff->GetDimensions()[0]));
+
+                neighbors.push_back(index_to_rowcol.at(p.first));
             }
+
             for(unsigned int j = 0; j < neighbors.size(); j++)
             {
                 double min_x = geoTransform[0] + neighbors.at(j).second * geoTransform[1] + neighbors.at(j).first * geoTransform[2];
                 double min_y = geoTransform[3] + neighbors.at(j).second * geoTransform[4] + neighbors.at(j).first * geoTransform[5];
-                std::vector<Point*> frame;
-                frame.push_back(new Point(min_x, min_y, 0));
-                frame.push_back(new Point(min_x + geoTransform[1], min_y, 0));
-                frame.push_back(new Point(frame.back()->getX(), min_y + geoTransform[5], 0));
-                frame.push_back(new Point(min_x, frame.back()->getY(), 0));
+                std::vector<std::shared_ptr<Point> > frame;
+                frame.push_back(std::make_shared<Point>(min_x, min_y, 0));
+                frame.push_back(std::make_shared<Point>(min_x + geoTransform[1], min_y, 0));
+                frame.push_back(std::make_shared<Point>(frame.back()->getX(), min_y + geoTransform[5], 0));
+                frame.push_back(std::make_shared<Point>(min_x, frame.back()->getY(), 0));
                 frame.push_back(frame[0]);
                 if(((*frame[0]) - (*boundaries[i][0])).norm() < std::max(((*bb[0]) - (*bb[2])).norm(), ((*frame[0]) - (*frame[2])).norm()))
                 {
@@ -711,14 +907,20 @@ namespace Utilities {
                     }
                 }
                 for(unsigned int l = 0; l < 4; l++)
-                    delete frame.at(l);
+                    frame.at(l).reset();
             }
             if(heights[i].size() == 0)
             {
-                std::cerr << "Impossible case: boundary does not include any pixel while no pixel wholly include the boundary and boundary intersects no pixel";
-                for(unsigned int j = 0; j < boundaries[i].size(); j++)
-                    boundaries[i][j]->print(std::cerr);
-                exit(6);
+                #pragma omp critical
+                {
+                    std::cerr << "Impossible case: boundary does not include any pixel while no pixel wholly include the boundary and boundary intersects no pixel" << std::endl;
+                    std::cerr << geoTransform[0] << " " << geoTransform[1] << " " << geoTransform[2] << " " << std::endl;
+                    std::cerr << geoTransform[3] << " " << geoTransform[4] << " " << geoTransform[5] << " " << std::endl << std::flush;
+                    std::cerr << dhm_tiff->GetDimensions()[0] << " " << dhm_tiff->GetDimensions()[1] << std::endl;
+                    for(unsigned int j = 0; j < boundaries[i].size(); j++)
+                        boundaries[i][j]->print(std::cerr);
+                    exit(6);
+                }
             }
             #pragma omp critical
             {
@@ -739,128 +941,6 @@ namespace Utilities {
         geoTransform[5] *= scale_factor;
         return heights;
     }
-
-
-
-//    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights3(std::vector<std::vector<Point3D> > boundaries, GeoTiff* dhm_tiff, Point3D origin,  double scale_factor)
-//    {
-//        std::vector<std::vector<std::pair<unsigned int, unsigned int> > > heights;
-//        my_vector_of_vectors_t points_vector;
-
-//        for(unsigned int i = 0; i < boundaries.size(); i++)
-//        {
-//            std::vector<std::pair<unsigned int, unsigned int> > boundary_heights;
-//            boundary_heights.clear();
-//            heights.push_back(boundary_heights);
-//        }
-//        float** dhm_heights = dhm_tiff->GetRasterBand(1);
-//        double* geoTransform = dhm_tiff->GetGeoTransform();
-//        //Apply scaling to increase the robustness of the method (coordinates of geographic positions are huge).
-//        geoTransform[0] = (geoTransform[0] - origin.getX()) / scale_factor;  //x del punto in alto a sinistra
-//        geoTransform[3] = (geoTransform[3] - origin.getY()) / scale_factor;  //y del punto in alto a sinistra
-//        geoTransform[1] /= scale_factor;
-//        geoTransform[5] /= scale_factor;
-
-//        for(unsigned int i = 0; i < dhm_tiff->GetDimensions()[0]; i++)
-//        {
-//            for(unsigned int j = 0; j < dhm_tiff->GetDimensions()[1]; j++)
-//            {
-//                std::vector<double> point = { geoTransform[0] + j * geoTransform[1] + i * geoTransform[2],
-//                                              geoTransform[3] + j * geoTransform[4] + i * geoTransform[5],
-//                                              0};
-//                points_vector.push_back(point);
-//            }
-//        }
-//        my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
-//        mat_index->index->buildIndex();
-
-//        #pragma omp parallel for num_threads(31)
-//        for(unsigned int i = 0; i < boundaries.size(); i++)
-//        {
-//            double min = std::numeric_limits<double>::max();
-//            double max = -std::numeric_limits<double>::max();
-//            double mean = 0;
-//            unsigned int assigned_points_number = 0;
-//            std::vector<Point3D> bb = bbExtraction(boundaries[i]);
-
-//            for(unsigned int j = 0; j < dhm_tiff->GetDimensions()[0]; j++)
-//            {
-//                for(unsigned int k = 0; k < dhm_tiff->GetDimensions()[1]; k++)
-//                {
-//                    Point3D p(geoTransform[0] + k * geoTransform[1] + j * geoTransform[2],
-//                              geoTransform[3] + k * geoTransform[4] + j * geoTransform[5], 0);
-
-//                    if(isPointInsidePolygon(p, bb) && isPointInsidePolygon(p, boundaries[i]))
-//                    {
-//                        //std::cout << j << " " << k << std::endl;
-//                        if(j >= dhm_tiff->GetDimensions()[0] || k >= dhm_tiff->GetDimensions()[1])
-//                            std::cerr<< "Point does not exist" << std::endl;
-//                        heights[i].push_back(std::make_pair(j,k));
-//                    }
-
-//                }
-//            }
-//            if(heights[i].size() == 0)
-//            {
-//                std::cout << "Height not found for polygon " << i << std::endl;
-//                for(unsigned int j = 0; j < boundaries[i].size() - 1; j++)
-//                {
-//                    double point[3] = {boundaries[i][j].getX(), boundaries[i][j].getY(), 0};
-//                    std::vector<size_t> ret_index(4);
-//                    std::vector<double> out_dist_sqr(4);
-//                    mat_index->index->knnSearch(point, 4, &ret_index[0], &out_dist_sqr[0]);
-//                    unsigned int maxPos = -1;
-//                    double max = -std::numeric_limits<double>::max();
-//                    for(unsigned int k = 0; k < 4; k++)
-//                    {
-//                        unsigned int row = ret_index[k] / dhm_tiff->GetDimensions()[1];
-//                        unsigned int col = ret_index[k] % dhm_tiff->GetDimensions()[1];
-//                        if(dhm_heights[row][col] > max)
-//                        {
-//                            maxPos = k;
-//                            max = dhm_heights[row][col];
-//                        }
-//                    }
-//                    if(ret_index[0] > dhm_tiff->GetDimensions()[0] * dhm_tiff->GetDimensions()[1] ||
-//                       ret_index[1] > dhm_tiff->GetDimensions()[0] * dhm_tiff->GetDimensions()[1] ||
-//                       ret_index[2] > dhm_tiff->GetDimensions()[0] * dhm_tiff->GetDimensions()[1] ||
-//                       ret_index[3] > dhm_tiff->GetDimensions()[0] * dhm_tiff->GetDimensions()[1])
-//                    {
-//                        std::cerr << "Impossible case. Knn search returns some out-of-bounds index. Maybe there are less than 4 points?" << std::endl
-//                                  << "The knn search return indices: " << std::endl;
-//                        std::cerr << ret_index[0] << std::endl;
-//                        std::cerr << ret_index[1] << std::endl;
-//                        std::cerr << ret_index[2] << std::endl;
-//                        std::cerr << ret_index[3] << std::endl;
-//                        exit(6);
-//                    }
-//                    if(maxPos > 3 || maxPos < 0)
-//                    {
-//                        std::cerr << "Impossible case. There is no neighbour with height greater than -infinite." << std::endl;
-//                        exit(7);
-//                    }
-//                    unsigned int row = ret_index[maxPos] / dhm_tiff->GetDimensions()[0];
-//                    unsigned int col = ret_index[maxPos] % dhm_tiff->GetDimensions()[0];
-
-//                    auto p = std::make_pair(row, col);
-//                    std::vector<std::pair<unsigned int, unsigned int> >::iterator it = std::find(heights[i].begin(), heights[i].end(), p);
-//                    heights[i].push_back(std::make_pair(row,col));
-
-//                }
-//            }
-
-
-
-//        }
-
-//        delete mat_index;
-//        geoTransform[0] = (geoTransform[0] * scale_factor + origin.getX());  //x del punto in alto a sinistra
-//        geoTransform[3] = (geoTransform[3] * scale_factor + origin.getY());  //y del punto in alto a sinistra
-//        geoTransform[1] *= scale_factor;
-//        geoTransform[5] *= scale_factor;
-
-//        return heights;
-//    }
 
     void associateHeights(TriangleMesh* mesh, GeoTiff* dhm_tiff, double scale_factor, Point origin)
     {
@@ -885,6 +965,7 @@ namespace Utilities {
         my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
         mat_index->index->buildIndex();
 
+        std::cout << "0%\r";
         #pragma omp parallel for num_threads(31)
         for(unsigned int i = 0; i < mesh->getVerticesNumber(); i++)
         {
@@ -917,7 +998,7 @@ namespace Utilities {
 
     }
 
-    void refineLines(std::vector<std::vector<Point*> > &lines, GeoTiff* dhm_tiff, double scale_factor, Point origin)
+    void refineLines(std::vector<std::vector<std::shared_ptr<Point> > > &lines, GeoTiff* dhm_tiff, double scale_factor, Point origin)
     {
 
         float** dhm_heights = dhm_tiff->GetRasterBand(1);
@@ -950,9 +1031,9 @@ namespace Utilities {
 
             for(unsigned int j = 1; j < lines.at(i).size(); j++)
             {
-                std::vector<Point*> intersections;
-                Point* v1 = lines.at(i).at(j - 1);
-                Point* v2 = lines.at(i).at(j);
+                std::vector<std::shared_ptr<Point> > intersections;
+                std::shared_ptr<Point> v1 = lines.at(i).at(j - 1);
+                std::shared_ptr<Point> v2 = lines.at(i).at(j);
                 Point middle(((*v1) + (*v2))  / 2);
                 double sphere_radius = std::max(pixel_diagonal_length, ((*v1) - (*v2)).norm() / 2);
 
@@ -969,16 +1050,16 @@ namespace Utilities {
                 {
                     double min_x = geoTransform[0] + neighbors.at(k).second * geoTransform[1] + neighbors.at(k).first * geoTransform[2];
                     double min_y = geoTransform[3] + neighbors.at(k).second * geoTransform[4] + neighbors.at(k).first * geoTransform[5];
-                    std::vector<Point*> frame;
-                    frame.push_back(new Point(min_x, min_y, 0));
-                    frame.push_back(new Point(min_x + geoTransform[1], min_y, 0));
-                    frame.push_back(new Point(frame.back()->getX(), min_y + geoTransform[5], 0));
-                    frame.push_back(new Point(min_x, frame.back()->getY(), 0));
+                    std::vector<std::shared_ptr<Point> > frame;
+                    frame.push_back(std::make_shared<Point>(min_x, min_y, 0));
+                    frame.push_back(std::make_shared<Point>(min_x + geoTransform[1], min_y, 0));
+                    frame.push_back(std::make_shared<Point>(frame.back()->getX(), min_y + geoTransform[5], 0));
+                    frame.push_back(std::make_shared<Point>(min_x, frame.back()->getY(), 0));
                     frame.push_back(frame[0]);
 
                     for(unsigned int l = 1; l < 5; l++)
                     {
-                        Point* pout = new Point;
+                        std::shared_ptr<Point> pout = std::make_shared<Point>();
                         bool intersects = Utilities::segmentsIntersection(v1, v2, frame.at(l - 1), frame.at(l), *pout);
 
                         if(intersects)
@@ -990,17 +1071,17 @@ namespace Utilities {
                             if(pos < 0 && *pout != *v1 && *pout != *v2)
                                 intersections.push_back(pout);
                             else if(pout != nullptr)
-                                delete pout;
+                                pout.reset();
                         } else if(pout != nullptr)
-                            delete pout;
+                            pout.reset();
                     }
 
                     for(unsigned int l = 1; l < 4; l++)
-                        delete frame.at(l);
+                        frame.at(l).reset();
                 }
                 neighbors.clear();
                 neighbors_distances.clear();
-                std::sort(intersections.begin(), intersections.end(), [v1](Point* a, Point* b) {
+                std::sort(intersections.begin(), intersections.end(), [v1](std::shared_ptr<Point> a, std::shared_ptr<Point> b) {
                     return ((*a) - (*v1)).norm() < ((*b) - (*v1)).norm();
                 });
 
@@ -1030,7 +1111,7 @@ namespace Utilities {
         geoTransform[5] *= scale_factor;
     }
 
-    Vertex* extractNearestVertex(std::vector<Vertex*> &frontier, std::map<Vertex*, double> distances){
+    std::shared_ptr<Vertex> extractNearestVertex(std::vector<std::shared_ptr<Vertex>> &frontier, std::map<std::shared_ptr<Vertex>, double> distances){
 
         double minDist = DBL_MAX;
         int minPos = -1;
@@ -1044,7 +1125,7 @@ namespace Utilities {
         if(minPos == -1)
             return nullptr;
 
-        Vertex* nearest = frontier[minPos];
+        std::shared_ptr<Vertex> nearest = frontier[minPos];
 
         frontier.erase(frontier.begin() + minPos);
 
@@ -1052,14 +1133,14 @@ namespace Utilities {
 
     }
 
-    std::vector<Vertex*> dijkstra(Vertex* v1, Vertex* v2){
+    std::vector<std::shared_ptr<Vertex>> dijkstra(std::shared_ptr<Vertex> v1, std::shared_ptr<Vertex> v2){
 
-        std::vector<Vertex*> frontier;
-        std::map<Vertex*, double> distances = {{v1, 0}};
-        std::map<Vertex*, Vertex*> predecessors = {{v1, nullptr}};
+        std::vector<std::shared_ptr<Vertex>> frontier;
+        std::map<std::shared_ptr<Vertex>, double> distances = {{v1, 0}};
+        std::map<std::shared_ptr<Vertex>, std::shared_ptr<Vertex>> predecessors = {{v1, nullptr}};
         std::set<Vertex*> v21RingNeighbors;
-        std::vector<Vertex*> shortestPath;
-        Vertex* v;
+        std::vector<std::shared_ptr<Vertex>> shortestPath;
+        std::shared_ptr<Vertex> v;
         bool v2visited = false;
 
         if((*v1) == (*v2)){
@@ -1076,14 +1157,14 @@ namespace Utilities {
                 return shortestPath;
             }
 
-            std::vector<Vertex*> neighbors = v->getVV();
-            for(std::vector<Vertex*>::iterator n = neighbors.begin(); n != neighbors.end(); n++){
-                Vertex* x = *n;
+            std::vector<std::shared_ptr<Vertex>> neighbors = v->getVV();
+            for(std::vector<std::shared_ptr<Vertex> >::iterator n = neighbors.begin(); n != neighbors.end(); n++){
+                std::shared_ptr<Vertex> x = *n;
 
-                if(x == v2 && v21RingNeighbors.find(v) == v21RingNeighbors.end())
-                    v21RingNeighbors.insert(v);
+                if(x->getId() == v2->getId() && v21RingNeighbors.find(&(*v)) == v21RingNeighbors.end())
+                    v21RingNeighbors.insert(&(*v));
 
-                std::map<Vertex*, Vertex*>::iterator pit = predecessors.find(x);
+                std::map<std::shared_ptr<Vertex>, std::shared_ptr<Vertex>>::iterator pit = predecessors.find(x);
                 double distanceVX;
 
                 distanceVX = distances[v] + x->computePointSegmentDistance(*v1, *v2);
@@ -1100,7 +1181,7 @@ namespace Utilities {
                     frontier.push_back(x);
                 }
             }
-            if(v == v2)
+            if(v->getId() == v2->getId())
                 v2visited = true;
 
         } while(!v2visited);
@@ -1115,146 +1196,7 @@ namespace Utilities {
         return shortestPath;
     }
 
-    void findFaces(std::vector<Triangle*> &faces, std::vector<Vertex*> vertices){
-
-        //For each vertex, we find the triangle ring and we insert in the array all the faces that aren't in it
-        for(unsigned long i = 0; i < vertices.size(); i++){
-
-            std::vector<Triangle*> vt = vertices[i]->getVT();
-            for(unsigned int j = 0; j < vt.size(); j++){
-                Triangle* t = vt.at(j);
-
-                std::vector<Triangle*>::iterator it = find(faces.begin(), faces.end(), t);
-                if(it == faces.end())
-                    faces.push_back(t);
-            }
-        }
-    }
-
-    Triangle* findCorrespondingTriangle(Point* v, std::vector<Triangle*> neighbors){
-
-        bool found = false;
-        double bestDistance = DBL_MAX;
-        Triangle* t = nullptr;
-        for(std::vector<Triangle*>::iterator it = neighbors.begin(); it != neighbors.end(); it++){
-            Triangle* t_ = static_cast<Triangle*>(*it) ;
-            Vertex* tv1 = t_->getV1(), *tv2 = t_->getV2(), *tv3 = t_->getV3();
-            Point p = linePlaneIntersection(*v, (*v) - t_->computeNormal(), *tv1, *tv2, *tv3);
-            if(t_->isPointInside(p)){
-                double actualDistance = t_->computeDistanceFromPoint(*v);
-                if(!found){
-                    t = t_;
-                    bestDistance = actualDistance;
-                    found = true;
-                } else if(actualDistance < bestDistance){
-                    t = t_;
-                    bestDistance = actualDistance;
-                }
-            }
-
-        }
-
-        return t;
-    }
-
-    Vertex* findCorrespondingVertex(Vertex* v, std::vector<Triangle*> neighbors){
-
-        double bestDistance = DBL_MAX;
-        Vertex* r = nullptr;
-        Triangle* t = findCorrespondingTriangle(v, neighbors);
-        if(t != nullptr){
-            Vertex* tv1 = t->getV1(), *tv2 = t->getV2(), *tv3 = t->getV3();
-            Point p = linePlaneIntersection(*v, (*v) + v->computeNormal(), *tv1, *tv2, *tv3);
-            Vertex* v_ = t->getV1();
-
-            for(int i = 0; i < 3; i++){
-                double actualDistance = ((p)-(*v_)).norm();
-                if(actualDistance < bestDistance){
-                    bestDistance = actualDistance;
-                    r = v_;
-                }
-                v_ = t->getNextVertex(v_);
-            }
-
-        }
-        return r;
-
-    }
-
-    std::vector<std::vector<Vertex*> > projectLines(std::vector<std::vector<Point*> > polyLines, TriangleMesh *otherMesh, double neighbourhoodSize)
-    {
-
-            Vertex* v, *initialVertex;                      //Some support variable
-            std::vector<std::vector<Vertex*> > otherPolyLines;
-
-            my_vector_of_vectors_t points_vector;
-            for(unsigned int i = 0; i < otherMesh->getVerticesNumber(); i++)
-            {
-                std::vector<double> point = { otherMesh->getVertex(i)->getX(),
-                                              otherMesh->getVertex(i)->getY(),
-                                              otherMesh->getVertex(i)->getZ()};
-                points_vector.push_back(point);
-            }
-
-            my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
-            mat_index->index->buildIndex();
-
-            for(std::vector<std::vector<Point*> >::iterator lit = polyLines.begin(); lit != polyLines.end(); lit++){
-
-                std::vector<Vertex*> otherPolyLine;
-                std::vector<Point*> polyLine = *lit;
-                std::vector<Point*>::iterator vit = polyLine.begin();
-                Vertex* v1, *v2;
-
-                do{
-                    v = static_cast<Vertex*>(*vit);
-                    std::vector<std::pair<size_t, double> > neighbors_distances;
-                    std::vector<Vertex*> neighbors;
-                    nanoflann::SearchParams params;
-                    double query_point[3] = {v->getX(), v->getY(), v->getZ()};
-                    mat_index->index->radiusSearch(query_point, neighbourhoodSize, neighbors_distances, params);
-                    for(std::vector<std::pair<size_t,double> >::iterator it = neighbors_distances.begin(); it != neighbors_distances.end(); it++){
-                        std::pair<size_t, double> p = static_cast<std::pair<long int, double> >(*it);
-                        neighbors.push_back(otherMesh->getVertex(p.first));
-                    }
-                    std::vector<Triangle*> toCheckTriangles;
-                    Utilities::findFaces(toCheckTriangles, neighbors);
-                    v1 = Utilities::findCorrespondingVertex(v, toCheckTriangles);
-                    if(v1 == nullptr)
-                        neighbourhoodSize *= 2;
-                }while(v1 == nullptr);
-                initialVertex = v1;
-
-                for(; vit != polyLine.end(); vit++){
-                    do{
-                        v = static_cast<Vertex*>(*vit);
-                        std::vector<std::pair<size_t, double> > neighbors_distances;
-                        std::vector<Vertex*> neighbors;
-                        nanoflann::SearchParams params;
-                        double query_point[3] = {v->getX(), v->getY(), v->getZ()};
-                        mat_index->index->radiusSearch(query_point, neighbourhoodSize, neighbors_distances, params);
-                        for(std::vector<std::pair<size_t,double> >::iterator it = neighbors_distances.begin(); it != neighbors_distances.end(); it++){
-                            std::pair<size_t, double> p = static_cast<std::pair<long int, double> >(*it);
-                            neighbors.push_back(otherMesh->getVertex(p.first));
-                        }
-                        std::vector<Triangle*> toCheckTriangles;
-                        Utilities::findFaces(toCheckTriangles, neighbors);
-                        v2 = Utilities::findCorrespondingVertex(v, toCheckTriangles);
-                        if(v2 == nullptr)
-                            neighbourhoodSize *= 2;
-                    }while(v2 == nullptr);
-                    std::vector<Vertex*> path = dijkstra(v1, v2);
-                    otherPolyLine.insert(otherPolyLine.end(), path.begin(), path.end());
-                    v1 = v2;
-                    otherPolyLines.push_back(otherPolyLine);
-                }
-
-            }
-
-            return otherPolyLines;
-    }
-
-    void removeLinePointsInPolygons(std::vector<std::vector<Point*> > &lines, std::vector<std::vector<Point*> > polygons)
+    void removeLinePointsInPolygons(std::vector<std::vector<std::shared_ptr<Point> > > &lines, std::vector<std::vector<std::shared_ptr<Point> > > polygons)
     {
         my_vector_of_vectors_t points_vector;
         std::map<unsigned int, unsigned int > pointPolygonLink;
@@ -1269,11 +1211,9 @@ namespace Utilities {
                 points_vector.push_back(point);
                 pointPolygonLink.insert(std::make_pair(id++, i));
             }
-            std::vector<Point*> bb = bbExtraction(polygons[i]);
-            //double diagMeasure = (*bb[2] - *bb[0]).norm();
-            meanDiagonal += (*bb[2] - *bb[0]).norm();/*
-            if(diagMeasure > meanDiagonal)
-                meanDiagonal = diagMeasure;*/
+            std::vector<std::shared_ptr<Point> > bb = bbExtraction(polygons[i]);
+            double diagMeasure = (*bb[2] - *bb[0]).norm();
+            meanDiagonal += diagMeasure;
         }
         meanDiagonal /= polygons.size();
 
@@ -1285,7 +1225,8 @@ namespace Utilities {
         for(unsigned int i = 0; i < lines.size(); i++)
         {
             for(unsigned int j = 0; j < lines[i].size(); j++){
-                Point* v = lines.at(i).at(j);
+                std::vector<std::shared_ptr<Point> > intersections;
+                std::shared_ptr<Point> v = lines.at(i).at(j);
                 std::vector<std::pair<size_t, double> > neighbors_distances;
                 std::vector<unsigned int> neighboringPolygons;
                 nanoflann::SearchParams params;
@@ -1299,13 +1240,15 @@ namespace Utilities {
                         neighboringPolygons.push_back(pointPolygonLink.at(p.first));
                 }
                 for(unsigned int k = 0; k < neighboringPolygons.size(); k++)
+                {
                     if(isPointInsidePolygon(v, polygons.at(neighboringPolygons.at(k))))
                     {
                         lines.at(i).erase(lines.at(i).begin() + j);
-                        delete v;
+                        v.reset();
                         j--;
                         break;
                     }
+                }
             }
 
             #pragma omp critical
@@ -1320,4 +1263,142 @@ namespace Utilities {
         std::cout << std::endl;
 
     }
+
+    std::vector<std::pair<unsigned int, unsigned int> > removeSegmentsIntersectingPolygons(std::vector<std::vector<std::shared_ptr<Point> > > &lines, std::vector<std::vector<std::shared_ptr<Point> > > &polygons)
+    {
+        std::vector<std::pair<unsigned int, unsigned int>> keptClippings;
+        my_vector_of_vectors_t points_vector;
+        std::map<unsigned int, unsigned int > pointPolygonLink;
+        unsigned int id = 0, counter = 0;
+        double meanDiagonal = 0;
+        for(unsigned int i = 0; i < polygons.size(); i++)
+        {
+            for(unsigned int j = 0; j < polygons[i].size() - 1; j++){
+                std::vector<double> point = { polygons.at(i).at(j)->getX(),
+                                              polygons.at(i).at(j)->getY(),
+                                              polygons.at(i).at(j)->getZ()};
+                points_vector.push_back(point);
+                pointPolygonLink.insert(std::make_pair(id++, i));
+            }
+            std::vector<std::shared_ptr<Point> > bb = bbExtraction(polygons[i]);
+            double diagMeasure = (*bb[2] - *bb[0]).norm();
+            meanDiagonal += diagMeasure;
+        }
+        meanDiagonal /= polygons.size();
+
+        my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
+        mat_index->index->buildIndex();
+
+        for(unsigned int i = 0; i < lines.size(); i++)
+        {
+            unsigned int deviation = 0;
+            for(unsigned int j = 1; j < lines[i].size(); j++){
+                std::vector<std::shared_ptr<Point> > intersections;
+                std::shared_ptr<Point> v = lines.at(i).at(j);
+                std::vector<std::pair<size_t, double> > neighbors_distances;
+                std::vector<unsigned int> neighboringPolygons;
+                nanoflann::SearchParams params;
+                double query_point[3] = {v->getX(), v->getY(), v->getZ()};
+                neighbors_distances.clear();
+                mat_index->index->radiusSearch(query_point, meanDiagonal / 2, neighbors_distances, params);
+                for(std::vector<std::pair<size_t,double> >::iterator it = neighbors_distances.begin(); it != neighbors_distances.end(); it++){
+                    std::pair<size_t, double> p = static_cast<std::pair<long int, double> >(*it);
+                    std::vector<unsigned int>::iterator pit = std::find(neighboringPolygons.begin(), neighboringPolygons.end(), pointPolygonLink.at(p.first));
+                    if(pit == neighboringPolygons.end())
+                        neighboringPolygons.push_back(pointPolygonLink.at(p.first));
+                }
+
+                for(unsigned int k = 0; k < neighboringPolygons.size(); k++)
+                {
+                    std::vector<std::shared_ptr<Point> > intersections;
+                    for(unsigned int l = 0; l < polygons.at(neighboringPolygons.at(k)).size(); l++)
+                    {
+                        std::shared_ptr<Point> pout = std::make_shared<Point>();
+                        if(segmentsIntersection(lines.at(i).at(j - 1), lines.at(i).at(j), polygons.at(neighboringPolygons.at(k)).at(l), polygons.at(neighboringPolygons.at(k)).at((l + 1) % polygons.at(neighboringPolygons.at(k)).size()), *pout))
+                        {
+                            polygons.at(neighboringPolygons.at(k)).insert(polygons.at(neighboringPolygons.at(k)).begin() + l + 1, pout);
+                            l++;
+                            intersections.push_back(pout);
+                        }
+
+                    }
+                    if(intersections.size() > 1)
+                    {
+
+                        if(intersections.size() % 2 != 0)
+                        {
+                            //Da gestire caso in cui segmento traversa uno "spuntone" di poligono e poi "tocca" una punta (tecnicamente sono 3 punti).
+                            //Al momento si ignora il caso, eliminando l'ultima intersezione e considerandolo come un caso con numero pari di intersezioni
+                            intersections.pop_back();
+                        }
+
+                        unsigned int firstPos = intersections.size() - 1, lastPos = 0;
+                        if((*intersections.at(intersections.size() - 1) - *lines.at(i).at(j - 1)).norm() < (*intersections.at(0) - *lines.at(i).at(j - 1)).norm())
+                        {
+                            firstPos = 0;
+                            lastPos = intersections.size() - 1;
+                        }
+                        std::vector<std::shared_ptr<Point> > remaining(lines.at(i).begin() + j, lines.at(i).end());
+                        lines.insert(lines.begin() + i + 1, remaining);
+                        lines.at(i + 1).insert(lines.at(i + 1).begin(), intersections.at(firstPos));
+                        lines.at(i).erase(lines.at(i).begin() + j, lines.at(i).end());
+                        lines.at(i).push_back(intersections.at(lastPos));
+                        deviation = intersections.size() / 2;
+                        keptClippings.push_back(std::make_pair(i, i + deviation));
+                        for(unsigned int l = 1; l < intersections.size() / 2; l++)
+                        {
+                            std::vector<std::shared_ptr<Point> > exteriorSegment = {intersections.at(l * 2 - 1), intersections.at(l * 2)};
+                            lines.insert(lines.begin() + i + 1, exteriorSegment);
+                        }
+
+                    }
+                }
+
+                i += deviation;
+            }
+
+            counter++;
+            std::cout << counter * 100 / lines.size() << "%\r" << std::flush;
+        }
+
+        std::cout << std::endl;
+        return keptClippings;
+    }
+
+    std::vector<std::vector<std::shared_ptr<Point> > > getClosest(std::vector<std::vector<std::shared_ptr<Point> > > list, std::vector<std::vector<std::shared_ptr<Point> > > p)
+    {
+        my_vector_of_vectors_t points_vector;
+        std::vector<std::vector<std::shared_ptr<Point> > > closest_points;
+        std::map<unsigned int, std::shared_ptr<Point> > points_pos;
+        unsigned int counter = 0;
+        for(unsigned int i = 0; i < list.size(); i++)
+        {
+            for(unsigned int j = 0; j < list[i].size() - 1; j++){
+                std::vector<double> point = { list.at(i).at(j)->getX(),
+                                              list.at(i).at(j)->getY(),
+                                              list.at(i).at(j)->getZ()};
+                points_vector.push_back(point);
+                points_pos.insert(std::make_pair(counter++, list.at(i).at(j)));
+            }
+        }
+
+        my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
+        mat_index->index->buildIndex();
+        for(unsigned int i = 0; i < p.size(); i++)
+        {
+            std::vector<std::shared_ptr<Point> > closest;
+            for(unsigned int j = 0; j < p.at(i).size(); j++)
+            {
+                nanoflann::SearchParams params;
+                double point[3] = {p.at(i).at(j)->getX(), p.at(i).at(j)->getY(), p.at(i).at(j)->getZ()};
+                std::vector<size_t> ret_index(1);
+                std::vector<double> out_dist_sqr(1);
+                mat_index->index->knnSearch(point, 1, &ret_index[0], &out_dist_sqr[0]);
+                closest.push_back(points_pos.at(ret_index[0]));
+            }
+            closest_points.push_back(closest);
+        }
+        return closest_points;
+    }
+
 }

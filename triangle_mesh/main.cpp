@@ -11,26 +11,26 @@ int main(int argc, char* argv[])
 //    mesh->load(argv[1]);
 //    mesh->save("prova.ply");
 
-    std::vector<std::vector<Point*> > boundaries;
-    std::vector<std::vector<Point*> > constraints;
-    std::vector<Point*> boundary = {
-        new Point(0,-3,0),
-        new Point(3,0,0),
-        new Point(0,3,0),
-        new Point(-3,0,0)
+    std::vector<std::vector<std::shared_ptr<Point>> > boundaries;
+    std::vector<std::vector<std::shared_ptr<Point>> > constraints;
+    std::vector<std::shared_ptr<Point>> boundary = {
+        std::make_shared<Point>(0,-3,0),
+        std::make_shared<Point>(3,0,0),
+        std::make_shared<Point>(0,3,0),
+        std::make_shared<Point>(-3,0,0)
     };
     boundaries.push_back(boundary);
-    std::vector<Point*> hole = {
-        new Point(-1,-1,0),
-        new Point(-1,1,0),
-        new Point(1,1,0),
-        new Point(1,-1,0)
+    std::vector<std::shared_ptr<Point>> hole = {
+        std::make_shared<Point>(-1,-1,0),
+        std::make_shared<Point>(-1,1,0),
+        std::make_shared<Point>(1,1,0),
+        std::make_shared<Point>(1,-1,0)
     };
     boundaries.push_back(hole);
 
-    std::vector<Point*> constraint = {
-        new Point(-0.5,0.5,0),
-        new Point(-0.5,-0.5,0)
+    std::vector<std::shared_ptr<Point>> constraint = {
+        std::make_shared<Point>(-0.5,0.5,0),
+        std::make_shared<Point>(-0.5,-0.5,0)
     };
     constraints.push_back(constraint);
     mesh->triangulate(boundaries, constraints);

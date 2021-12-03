@@ -15,13 +15,13 @@ TriangleMesh::~TriangleMesh()
 
     for(unsigned int i = 0; i < vertices.size(); i++)
         if(vertices.at(i) != nullptr)
-            delete vertices.at(i);
+            vertices.at(i).reset();
     for(unsigned int i = 0; i < edges.size(); i++)
         if(edges.at(i) != nullptr)
-            delete edges.at(i);
+            edges.at(i).reset();
     for(unsigned int i = 0; i < triangles.size(); i++)
         if(triangles.at(i) != nullptr)
-            delete triangles.at(i);
+            triangles.at(i).reset();
 }
 
 unsigned int TriangleMesh::getVerticesNumber()
@@ -39,83 +39,85 @@ unsigned int TriangleMesh::getTrianglesNumber()
     return triangles.size();
 }
 
-Vertex* TriangleMesh::addNewVertex()
+std::shared_ptr<Vertex> TriangleMesh::addNewVertex()
 {
-    vertices.push_back(new Vertex());
+    vertices.push_back(std::make_shared<Vertex>());
     return vertices.back();
 }
 
-Vertex* TriangleMesh::addNewVertex(double x, double y, double z)
+std::shared_ptr<Vertex> TriangleMesh::addNewVertex(double x, double y, double z)
 {
-    vertices.push_back(new Vertex(x, y, z));
+    vertices.push_back(std::make_shared<Vertex>(x, y, z));
     return vertices.back();
 }
 
-Vertex* TriangleMesh::addNewVertex(Point p)
+std::shared_ptr<Vertex> TriangleMesh::addNewVertex(Point p)
 {
-    return addNewVertex(p.getX(), p.getY(), p.getZ());
+    std::shared_ptr<Vertex> v = addNewVertex(p.getX(), p.getY(), p.getZ());
+    v->setInfo(p.getInfo());
+    return v;
 }
 
-Vertex* TriangleMesh::addNewVertex(Vertex*  v)
+std::shared_ptr<Vertex> TriangleMesh::addNewVertex(std::shared_ptr<Vertex>  v)
 {
-    vertices.push_back(new Vertex(v));
+    vertices.push_back(std::make_shared<Vertex>(v));
     return vertices.back();
 }
 
-Vertex *TriangleMesh::getVertex(unsigned int pos)
+std::shared_ptr<Vertex> TriangleMesh::getVertex(unsigned int pos)
 {
     if(pos > vertices.size())
         return nullptr;
     return vertices.at(pos);
 }
 
-Edge *TriangleMesh::getEdge(unsigned int pos)
+std::shared_ptr<Edge> TriangleMesh::getEdge(unsigned int pos)
 {
     if(pos > edges.size())
         return nullptr;
     return edges.at(pos);
 }
 
-Triangle *TriangleMesh::getTriangle(unsigned int pos)
+std::shared_ptr<Triangle> TriangleMesh::getTriangle(unsigned int pos)
 {
     if(pos > triangles.size())
         return nullptr;
     return triangles.at(pos);
 }
 
-Edge* TriangleMesh::addNewEdge()
+std::shared_ptr<Edge> TriangleMesh::addNewEdge()
 {
-    edges.push_back(new Edge());
+    edges.push_back(std::make_shared<Edge>());
     return edges.back();
 }
 
-Edge* TriangleMesh::addNewEdge(Vertex* v1, Vertex* v2)
+std::shared_ptr<Edge> TriangleMesh::addNewEdge(std::shared_ptr<Vertex> v1, std::shared_ptr<Vertex> v2)
 {
-    edges.push_back(new Edge(v1, v2));
+    edges.push_back(std::make_shared<Edge>(v1, v2));
     return edges.back();
 }
 
-Edge* TriangleMesh::addNewEdge(Edge* e)
+std::shared_ptr<Edge> TriangleMesh::addNewEdge(std::shared_ptr<Edge> e)
 {
-    edges.push_back(new Edge(e));
+    edges.push_back(std::make_shared<Edge>(e));
     return edges.back();
 }
 
-Triangle* TriangleMesh::addNewTriangle()
+std::shared_ptr<Triangle> TriangleMesh::addNewTriangle()
 {
-    triangles.push_back(new Triangle());
+    triangles.push_back(std::make_shared<Triangle>());
     return triangles.back();
 }
 
-Triangle* TriangleMesh::addNewTriangle(Edge* e1, Edge* e2, Edge* e3)
+std::shared_ptr<Triangle> TriangleMesh::addNewTriangle(std::shared_ptr<Edge> e1, std::shared_ptr<Edge> e2, std::shared_ptr<Edge> e3)
 {
-    triangles.push_back(new Triangle(e1, e2, e3));
+    triangles.push_back(std::make_shared<Triangle>(e1, e2, e3));
     return triangles.back();
 }
 
-Triangle* TriangleMesh::addNewTriangle(Triangle* t)
+std::shared_ptr<Triangle> TriangleMesh::addNewTriangle(std::shared_ptr<Triangle> t)
 {
-    triangles.push_back(new Triangle(t));
+    triangles.push_back(std::make_shared<Triangle>(t));
     return triangles.back();
 }
 
@@ -177,11 +179,11 @@ unsigned int TriangleMesh::removeIsolatedVertices()
     {
         if(vertices.at(i)->getE0() == nullptr)
         {
-            Vertex* v = vertices.at(i);
+            std::shared_ptr<Vertex> v = vertices.at(i);
             for(unsigned int j = i + 1; j < vertices.size(); j++)
                 vertices.at(j)->setId(vertices.at(j)->getId() - 1);
             vertices.erase(vertices.begin() + i);
-            delete v;
+            v.reset();
             removed++;
             i--;
         }
@@ -189,7 +191,7 @@ unsigned int TriangleMesh::removeIsolatedVertices()
     return removed;
 }
 
-Edge* TriangleMesh::searchEdgeContainingVertex(std::vector<Edge*> list, Vertex* v)
+std::shared_ptr<Edge> TriangleMesh::searchEdgeContainingVertex(std::vector<std::shared_ptr<Edge> > list, std::shared_ptr<Vertex> v)
 {
     for(unsigned int i = 0; i < list.size(); i++)
         if(list.at(i)->hasVertex(v))
@@ -199,25 +201,25 @@ Edge* TriangleMesh::searchEdgeContainingVertex(std::vector<Edge*> list, Vertex* 
 }
 
 
-int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, std::vector<std::vector<Point *> > &constraints)
+int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > > &boundaries, std::vector<std::vector<std::shared_ptr<Point> > > &constraints)
 {
     if(boundaries.size() < 1)
         return -1;
-    std::vector<std::vector<Point *> > holes(boundaries.begin() + 1, boundaries.end());
+    std::vector<std::vector<std::shared_ptr<Point> > > holes(boundaries.begin() + 1, boundaries.end());
     std::vector<double*> exterior_boundary_double_array;
     std::vector<std::vector<double*> > holes_double_arrays;
-    std::map<Vertex*, std::vector<Edge*> > vertices_edges;
+    std::map<std::shared_ptr<Vertex>, std::vector<std::shared_ptr<Edge> > > vertices_edges;
     unsigned int vertices_id = vertices.size();
     unsigned int edges_id = edges.size();
     unsigned int triangles_id = triangles.size();
     /**The first boundary is the exterior boundary**/
     for(unsigned int i = 0; i < boundaries.at(0).size(); i++)
     {
-        std::vector<Edge*> incident;
-        Point* tmp = boundaries.at(0).at(i);
+        std::vector<std::shared_ptr<Edge> > incident;
+        std::shared_ptr<Point> tmp = boundaries.at(0).at(i);
         exterior_boundary_double_array.push_back(tmp->toDoubleArray());
-        boundaries.at(0).at(i) = addNewVertex(tmp->getX(), tmp->getY(), tmp->getZ());
-        delete tmp;
+        boundaries.at(0).at(i) = addNewVertex(*tmp);
+        tmp.reset();
         vertices.back()->setId(vertices_id++);
         vertices_edges.insert(std::make_pair(vertices.back(), incident));
     }
@@ -227,11 +229,11 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
         std::vector<double*> hole_double_array;
         for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
         {
-            std::vector<Edge*> incident;
-            Point* tmp = boundaries.at(i).at(j);
+            std::vector<std::shared_ptr<Edge> > incident;
+            std::shared_ptr<Point> tmp = boundaries.at(i).at(j);
             hole_double_array.push_back(tmp->toDoubleArray());
             boundaries.at(i).at(j) = addNewVertex(tmp->getX(), tmp->getY(), tmp->getZ());
-            delete tmp;
+            tmp.reset();
             vertices.back()->setId(vertices_id++);
             vertices_edges.insert(std::make_pair(vertices.back(), incident));
         }
@@ -247,27 +249,27 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
         for(int j = 0; j < constraints.at(i).size(); j++)
         {
             int pos = -1;
-            for(unsigned int k = constraints_vertices_first_index; k < vertices.size(); k++)
+            for(unsigned int k = 0; k < vertices.size(); k++)
                 if((*constraints.at(i).at(j)) == (*vertices.at(k)))
                 {
                     //std::cout << i << " " << j << " " << k << std::endl << "Point before ";
-                    Point* tmp = static_cast<Vertex*>(constraints.at(i).at(j));
+                    std::shared_ptr<Point> tmp = constraints.at(i).at(j);
                     //tmp->print(std::cout);
                     //std::cout << "Point after ";
                     //vertices.at(k)->print(std::cout);
                     constraints.at(i).at(j) = vertices.at(k);
-                    delete tmp;
+                    tmp.reset();
                     tmp = nullptr;
                     pos = k;
                     break;
                 }
             if(pos < 0)
             {
-                std::vector<Edge*> incident;
-                Point* tmp = constraints.at(i).at(j);
-                Vertex* v = addNewVertex(tmp->getX(), tmp->getY(), tmp->getZ());
+                std::vector<std::shared_ptr<Edge> > incident;
+                std::shared_ptr<Point> tmp = constraints.at(i).at(j);
+                std::shared_ptr<Vertex> v = addNewVertex(*tmp);
                 constraints.at(i).at(j) = v;
-                delete tmp;
+                tmp.reset();
                 v->setId(vertices_id++);
                 vertices_edges.insert(std::make_pair(v, incident));
                 constraint_vertices.push_back(v->toDoubleArray());
@@ -287,7 +289,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
     std::vector<double*> generated_points = helper.getAddedPoints();
     for(unsigned int i = 0; i < generated_points.size(); i++)
     {
-        std::vector<Edge*> incident;
+        std::vector<std::shared_ptr<Edge> > incident;
         addNewVertex(generated_points.at(i)[0], generated_points.at(i)[1], 0);
         vertices.back()->setId(vertices_id++);
         vertices_edges.insert(std::make_pair(vertices.back(), incident));
@@ -296,9 +298,8 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
     std::cout << "Ended! Created " << generated_triangles.size() / 3 << " triangles." << std::endl << "Building mesh structure:" << std::endl;
     for(unsigned int i = 0; i < generated_triangles.size() / 3; i++)
     {
-        unsigned int polyVertNum;
         unsigned int v1 = generated_triangles.at(i * 3), v2 = generated_triangles.at(i * 3 + 1), v3 = generated_triangles.at(i * 3 + 2);
-        Edge* e1, *e2, *e3;
+        std::shared_ptr<Edge> e1, e2, e3;
 
         e1 = searchEdgeContainingVertex(vertices_edges.at(vertices.at(v1)), vertices.at(v2));
         if(e1 == nullptr)
@@ -310,6 +311,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
             e1->setId(edges_id++);
             vertices_edges.at(vertices.at(v1)).push_back(e1);
         }
+        vertices.at(v1)->setE0(e1);
         e2 = searchEdgeContainingVertex(vertices_edges.at(vertices.at(v2)), vertices.at(v3));
         if(e2 == nullptr)
             e2 = searchEdgeContainingVertex(vertices_edges.at(vertices.at(v3)), vertices.at(v2));
@@ -317,9 +319,10 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
         {
             addNewEdge(vertices.at(v2), vertices.at(v3));
             e2 = edges.back();
-            e1->setId(edges_id++);
+            e2->setId(edges_id++);
             vertices_edges.at(vertices.at(v2)).push_back(e2);
         }
+        vertices.at(v2)->setE0(e2);
         e3 = searchEdgeContainingVertex(vertices_edges.at(vertices.at(v3)), vertices.at(v1));
         if(e3 == nullptr)
             e3 = searchEdgeContainingVertex(vertices_edges.at(vertices.at(v1)), vertices.at(v3));
@@ -327,9 +330,10 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
         {
             addNewEdge(vertices.at(v3), vertices.at(v1));
             e3 = edges.back();
-            e1->setId(edges_id++);
+            e3->setId(edges_id++);
             vertices_edges.at(vertices.at(v3)).push_back(e3);
         }
+        vertices.at(v3)->setE0(e3);
 
         addNewTriangle(e1, e2, e3);
         triangles.back()->setId(triangles_id++);
@@ -363,7 +367,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
 //    for(unsigned int i = 0; i < boundaries.size(); i++)
 //    {
 //        for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
-//            if(boundaries.at(i).at(j) == nullptr || static_cast<Vertex*>(boundaries.at(i).at(j)) == nullptr)
+//            if(boundaries.at(i).at(j) == nullptr || static_cast<std::shared_ptr<Vertex> >(boundaries.at(i).at(j)) == nullptr)
 //            {
 //                boundaries.at(i).erase(boundaries.at(i).begin() + j);
 //                j--;
@@ -373,7 +377,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<Point *> > &boundaries, st
 //    for(unsigned int i = 0; i < constraints.size(); i++)
 //    {
 //        for(unsigned int j = 0; j < constraints.at(i).size(); j++)
-//            if(constraints.at(i).at(j) == nullptr || static_cast<Vertex*>(constraints.at(i).at(j)) == nullptr)
+//            if(constraints.at(i).at(j) == nullptr || static_cast<std::shared_ptr<Vertex> >(constraints.at(i).at(j)) == nullptr)
 //            {
 //                constraints.at(i).erase(constraints.at(i).begin() + j);
 //                j--;
@@ -395,7 +399,7 @@ int TriangleMesh::loadPLY(std::string filename)
         unsigned int reached_vertex_id = 0;
         unsigned int reached_edge_id = 0;
         unsigned int reached_triangle_id = 0;
-        std::map<Vertex*, std::vector<Edge*> > vertices_edges;
+        std::map<std::shared_ptr<Vertex>, std::vector<std::shared_ptr<Edge> > > vertices_edges;
         std::string line;
         std::getline(fileStream, line);
         if(line.compare("ply") != 0)
@@ -436,9 +440,9 @@ int TriangleMesh::loadPLY(std::string filename)
                 sstream >> x;
                 sstream >> y;
                 sstream >> z;
-                Vertex* v = addNewVertex(x, y, z);
+                std::shared_ptr<Vertex> v = addNewVertex(x, y, z);
                 v->setId(reached_vertex_id++);
-                std::vector<Edge*> incident;
+                std::vector<std::shared_ptr<Edge> > incident;
                 vertices_edges.insert(std::make_pair(v, incident));
                 if(i % 100 == 0)
                     std::cout << i * 100 / vertices_number << "%\r" << std::flush;;
@@ -451,7 +455,7 @@ int TriangleMesh::loadPLY(std::string filename)
                 std::stringstream sstream(line);
                 unsigned int polyVertNum;
                 unsigned int v1, v2, v3;
-                Edge* e1, *e2, *e3;
+                std::shared_ptr<Edge> e1, e2, e3;
                 sstream >> polyVertNum;
                 sstream >> v1;
                 sstream >> v2;

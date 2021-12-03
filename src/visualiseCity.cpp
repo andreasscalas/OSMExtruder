@@ -67,14 +67,14 @@ int main(int argc, char *argv[])
         const unsigned char BLACK[3] =  {0,0,0};
         double minEdgeLength = std::numeric_limits<double>::max();
         for(unsigned int i = 0; i < mesh->getVerticesNumber(); i++){
-            Vertex* v = mesh->getVertex(i);
+            std::shared_ptr<Vertex> v = mesh->getVertex(i);
             meshPoints->InsertNextPoint(v->getX(), v->getY(), v->getZ());
             meshVColors->InsertNextTypedTuple(BLUE);
         }
 
 
         for(unsigned int i = 0; i < mesh->getEdgesNumber(); i++){
-            Edge* e = mesh->getEdge(i);
+            std::shared_ptr<Edge> e = mesh->getEdge(i);
             vtkSmartPointer<vtkLine> edge = vtkSmartPointer<vtkLine>::New();
             edge->GetPointIds()->SetNumberOfIds(2);
             edge->GetPointIds()->SetId(0, static_cast<vtkIdType>(e->getV1()->getId()));
@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
 
 
         for(unsigned int i = 0; i < mesh->getTrianglesNumber(); i++){
-            Triangle* t = mesh->getTriangle(i);
-            Vertex *v1, *v2, *v3;
+            std::shared_ptr<Triangle> t = mesh->getTriangle(i);
+            std::shared_ptr<Vertex> v1, v2, v3;
             v1 = t->getV1();
             v2 = t->getV2();
             v3 = t->getV3();

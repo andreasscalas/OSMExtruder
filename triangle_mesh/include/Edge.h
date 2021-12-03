@@ -14,24 +14,24 @@ class Edge
 {
 public:
     Edge();
-    Edge(Vertex*, Vertex*);
-    Edge(Edge*);
+    Edge(std::shared_ptr<Vertex>, std::shared_ptr<Vertex>);
+    Edge(std::shared_ptr<Edge>);
     ~Edge();
 
-    Vertex*  getCommonVertex(Edge* e2);
-    Vertex*  getOppositeVertex(Vertex*  v);
-    Triangle* getLeftTriangle(Vertex* );
-    Triangle* getRightTriangle(Vertex* v);
-    bool hasVertex(Vertex* );
+    std::shared_ptr<Vertex>  getCommonVertex(std::shared_ptr<Edge> e2);
+    std::shared_ptr<Vertex>  getOppositeVertex(std::shared_ptr<Vertex>  v);
+    std::shared_ptr<Triangle> getLeftTriangle(std::shared_ptr<Vertex> );
+    std::shared_ptr<Triangle> getRightTriangle(std::shared_ptr<Vertex> v);
+    bool hasVertex(std::shared_ptr<Vertex> );
 
-    Vertex* getV1() const;
-    void setV1(Vertex* newV1);
-    Vertex* getV2() const;
-    void setV2(Vertex* newV2);
-    Triangle* getT1() const;
-    void setT1(Triangle* newT1);
-    Triangle* getT2() const;
-    void setT2(Triangle* newT2);
+    std::shared_ptr<Vertex> getV1() const;
+    void setV1(std::shared_ptr<Vertex> newV1);
+    std::shared_ptr<Vertex> getV2() const;
+    void setV2(std::shared_ptr<Vertex> newV2);
+    std::shared_ptr<Triangle> getT1() const;
+    void setT1(std::shared_ptr<Triangle> newT1);
+    std::shared_ptr<Triangle> getT2() const;
+    void setT2(std::shared_ptr<Triangle> newT2);
     const std::vector<void *> &getInformation() const;
     void setInformation(const std::vector<void *> &newInformation);
     const std::vector<FlagType> &getAssociatedFlags() const;
@@ -53,10 +53,10 @@ public:
 
 protected:
     unsigned int id;
-    Vertex*  v1;
-    Vertex*  v2;
-    Triangle* t1;
-    Triangle* t2;
+    std::shared_ptr<Vertex>  v1;
+    std::shared_ptr<Vertex>  v2;
+    std::shared_ptr<Triangle> t1;
+    std::shared_ptr<Triangle> t2;
     std::vector<void*> information;
     std::vector<FlagType> associated_flags;
 };

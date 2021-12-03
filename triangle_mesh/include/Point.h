@@ -16,18 +16,21 @@ class Point
 {
 public:
 
-    static constexpr double EPSILON = 1e-10;
+    static constexpr double EPSILON = 1e-8;
     Point(){
         x = std::numeric_limits<double>::max();
         y = std::numeric_limits<double>::max();
         z = std::numeric_limits<double>::max();
+        info = nullptr;
     }
 
     Point(double x, double y, double z){
         this->x = x;
         this->y = y;
         this->z = z;
+        info = nullptr;
     }
+
 
     double norm() { return std::sqrt(x * x + y * y + z * z); }
 
@@ -148,6 +151,7 @@ public:
         this->x = other.getX();
         this->y = other.getY();
         this->z = other.getZ();
+        this->info = other.info;
     }
 
     inline double* toDoubleArray() const
@@ -213,10 +217,25 @@ public:
         return po * normal;
     }
 
+    void *getInfo() const;
+    void setInfo(void *value);
+
 protected:
-        double x;
-        double y;
-        double z;
+    double x;
+    double y;
+    double z;
+    void* info; //AAAAAARGH IL RITORNO
+
 
 };
+
+inline void *Point::getInfo() const
+{
+    return info;
+}
+
+inline void Point::setInfo(void *value)
+{
+    info = value;
+}
 #endif // POINT_H

@@ -19,20 +19,20 @@ public:
     Vertex(double x, double y, double z);
     Vertex(double* p);
     Vertex(Point p);
-    Vertex(Point* p);
-    Vertex(Vertex*  p);
+    Vertex(std::shared_ptr<Point> p);
+    Vertex(std::shared_ptr<Vertex> v);
     ~Vertex();
 
-    Edge* getE0() const;
-    void setE0(Edge* newE0);
+    std::shared_ptr<Edge> getE0() const;
+    void setE0(std::shared_ptr<Edge> newE0);
     const std::vector<void *> &getInformation() const;
     void setInformation(const std::vector<void *> &newInformation);
     const std::vector<FlagType> &getAssociatedFlags() const;
     void setAssociatedFlags(const std::vector<FlagType> &newAssociatedFlags);
-    std::vector<Vertex* > getVV();
-    std::vector<Edge* > getVE();
-    std::vector<Triangle* > getVT();
-    Edge* getCommonEdge(Vertex*  v);
+    std::vector<std::shared_ptr<Vertex> > getVV();
+    std::vector<std::shared_ptr<Edge> > getVE();
+    std::vector<std::shared_ptr<Triangle> > getVT();
+    std::shared_ptr<Edge> getCommonEdge(std::shared_ptr<Vertex> v);
     Point computeNormal();
 
     bool addFlag(FlagType);
@@ -50,7 +50,7 @@ public:
 
 protected:
     unsigned int id;
-    Edge* e0;
+    std::shared_ptr<Edge> e0;
     std::vector<void*> information;
     std::vector<FlagType> associated_flags;
 };
