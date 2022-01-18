@@ -164,6 +164,12 @@ bool Vertex::removeInfo(unsigned int position)
     return false;
 }
 
+bool Vertex::clearInfo()
+{
+    information.clear();
+    return true;
+}
+
 unsigned int Vertex::getId() const
 {
     return id;

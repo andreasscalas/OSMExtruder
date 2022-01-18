@@ -4,8 +4,10 @@
 #include <Vertex.h>
 #include <Edge.h>
 #include <Triangle.h>
+#include <annotation.h>
 #include <memory>
 
+class Annotation;
 class TriangleMesh
 {
 public:
@@ -33,12 +35,21 @@ public:
     int triangulate(std::vector<std::vector<std::shared_ptr<Point> > > &boundaries, std::vector<std::vector<std::shared_ptr<Point> > > &constraints);
     std::shared_ptr<Edge> searchEdgeContainingVertex(std::vector<std::shared_ptr<Edge> > list, std::shared_ptr<Vertex> v);
 
+    const std::vector<std::shared_ptr<Annotation> > &getAnnotations() const;
+    void clearAnnotations();
+    void setAnnotations(const std::vector<std::shared_ptr<Annotation> > &newAnnotations);
+    bool addAnnotation(const std::shared_ptr<Annotation> &newAnnotation);
+    std::shared_ptr<Annotation> getAnnotation(unsigned int);
+    bool removeAnnotation(unsigned int);
+
 protected:
     std::vector<std::shared_ptr<Vertex> > vertices;
     std::vector<std::shared_ptr<Edge> > edges;
     std::vector<std::shared_ptr<Triangle> > triangles;
+    std::vector<std::shared_ptr<Annotation> > annotations;
 
     int loadPLY(std::string filename);
 };
+
 
 #endif // TRIANGLEMESH_H

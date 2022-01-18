@@ -151,7 +151,7 @@ public:
         this->x = other.getX();
         this->y = other.getY();
         this->z = other.getZ();
-        this->info = other.info;
+        this->info = other.getInfo();
     }
 
     inline double* toDoubleArray() const
@@ -217,8 +217,15 @@ public:
         return po * normal;
     }
 
-    void *getInfo() const;
-    void setInfo(void *value);
+    inline void *getInfo() const
+    {
+        return info;
+    }
+
+    inline void setInfo(void *value)
+    {
+        info = value;
+    }
 
 protected:
     double x;
@@ -229,13 +236,4 @@ protected:
 
 };
 
-inline void *Point::getInfo() const
-{
-    return info;
-}
-
-inline void Point::setInfo(void *value)
-{
-    info = value;
-}
 #endif // POINT_H

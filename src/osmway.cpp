@@ -102,3 +102,14 @@ void OSMWay::setNodes(const std::vector<std::shared_ptr<OSMNode> > &value)
 {
     nodes = value;
 }
+
+bool OSMWay::removeNode(std::string id)
+{
+    for(unsigned int i = 0; i < nodes.size(); i++)
+        if(nodes.at(i)->getId().compare(id) == 0)
+        {
+            nodes.erase(nodes.begin() + i);
+            return true;
+        }
+    return false;
+}

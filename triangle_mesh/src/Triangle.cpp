@@ -64,14 +64,49 @@ void Triangle::setE3(std::shared_ptr<Edge> newE3)
     e3 = newE3;
 }
 
+std::shared_ptr<Vertex> Triangle::getPreviousVertex(std::shared_ptr<Vertex> v)
+{
+    if(getV1()->getId() == v->getId())
+        return getV3();
+    if(getV2()->getId() == v->getId())
+        return getV1();
+    if(getV3()->getId() == v->getId())
+        return getV2();
+    return nullptr;
+
+}
+
 std::shared_ptr<Vertex> Triangle::getNextVertex(std::shared_ptr<Vertex> v)
 {
-    if(e1->hasVertex(v))
-        return e1->getOppositeVertex(v);
-    if(e2->hasVertex(v))
-        return e2->getOppositeVertex(v);
-    if(e3->hasVertex(v))
-        return e3->getOppositeVertex(v);
+    if(getV1()->getId() == v->getId())
+        return getV2();
+    if(getV2()->getId() == v->getId())
+        return getV3();
+    if(getV3()->getId() == v->getId())
+        return getV1();
+    return nullptr;
+}
+
+std::shared_ptr<Edge> Triangle::getPreviousEdge(std::shared_ptr<Edge> e)
+{
+    if(e->getId() == e1->getId())
+        return e3;
+    if(e->getId() == e2->getId())
+        return e1;
+    if(e->getId() == e3->getId())
+        return e2;
+    return nullptr;
+
+}
+
+std::shared_ptr<Edge> Triangle::getNextEdge(std::shared_ptr<Edge> e)
+{
+    if(e->getId() == e1->getId())
+        return e2;
+    if(e->getId() == e2->getId())
+        return e3;
+    if(e->getId() == e3->getId())
+        return e1;
     return nullptr;
 }
 
@@ -291,7 +326,7 @@ bool Triangle::addInformation(void *info)
     return false;
 }
 
-int Triangle::searchInfo(void * info)
+int Triangle::searchInformation(void * info)
 {
     std::vector<void*>::iterator it = std::find(information.begin(), information.end(), info);
     if(it != information.end())
@@ -299,9 +334,9 @@ int Triangle::searchInfo(void * info)
     return -1;
 }
 
-bool Triangle::removeInfo(void *info)
+bool Triangle::removeInformation(void *info)
 {
-    int flagPosition = searchInfo(info);
+    int flagPosition = searchInformation(info);
     if(flagPosition >= 0)
     {
         information.erase(information.begin() + flagPosition);
@@ -310,7 +345,7 @@ bool Triangle::removeInfo(void *info)
     return false;
 }
 
-bool Triangle::removeInfo(unsigned int position)
+bool Triangle::removeInformation(unsigned int position)
 {
     if(position < information.size())
     {
@@ -318,6 +353,12 @@ bool Triangle::removeInfo(unsigned int position)
         return true;
     }
     return false;
+}
+
+bool Triangle::clearInformation()
+{
+    information.clear();
+    return true;
 }
 
 void Triangle::print(std::ostream &stream)

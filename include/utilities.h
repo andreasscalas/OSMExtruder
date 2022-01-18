@@ -19,6 +19,7 @@
 #include <Point.h>
 #include <geotiff.h>
 #include <KDTreeVectorOfVectorsAdaptor.h>
+#include <glob.h>
 
 namespace Utilities {
 
@@ -388,6 +389,14 @@ namespace Utilities {
 //    }
 
 
+    unsigned int findNodeInList(std::vector<std::shared_ptr<OSMNode> > list, unsigned int begin, unsigned int end, std::shared_ptr<OSMNode> p)
+    {
+        for(unsigned int i = begin; i < end; i++)
+            if(list.at(i)->getId() == p->getId())
+                return i;
+        return end;
+    }
+
     std::vector<std::shared_ptr<Point> >::iterator findPointInList(std::vector<std::shared_ptr<Point> >::iterator begin, std::vector<std::shared_ptr<Point> >::iterator end, std::shared_ptr<Point> p)
     {
         for(std::vector<std::shared_ptr<Point> >::iterator it = begin; it != end; it++)
@@ -402,7 +411,7 @@ namespace Utilities {
      */
     void fix_polygon(std::vector<std::shared_ptr<Point> > &boundary)
     {
-        for (unsigned int i = 0; i < boundary.size() - 1; i++) {
+        for (unsigned int i = 0; i < boundary.size(); i++) {
 
             while(i < boundary.size() - 1 && (*boundary[i]) == (*boundary[i + 1]))
             {
@@ -434,6 +443,30 @@ namespace Utilities {
 
     }
 
+    void fix_line(std::shared_ptr<OSMWay > way)
+    {
+        for (int i = 1; i < static_cast<int>(way->getNodes().size()); i++) {
+            while(i < way->getNodes().size() - 1 && *way->getNodes().at(i)->getCoordinates() == *way->getNodes().at(i - 1)->getCoordinates())
+            {
+                std::shared_ptr<OSMNode> tmp = way->getNodes().at(i);
+                way->removeNode(way->getNodes().at(i)->getId());
+                tmp.reset();
+            }
+
+            unsigned int it = findNodeInList(way->getNodes(), i + 1, way->getNodes().size(), way->getNodes().at(i));
+            while(it < way->getNodes().size() && way->getNodes().at(it)->getId() != way->getNodes().at(i)->getId())
+            {
+                for(unsigned int it1 = i + 1; it1 <= it; it1++)
+                    way->getNodes().at(it1).reset();
+                std::shared_ptr<OSMNode> tmp = way->getNodes().at(i);
+                way->removeNode(way->getNodes().at(i)->getId());
+                tmp.reset();
+                it = findNodeInList(way->getNodes(), i + 1, way->getNodes().size(), way->getNodes().at(i));
+            }
+
+        }
+    }
+
     void fix_line(std::vector<std::shared_ptr<Point> > &line)
     {
         for (int i = 0; i < static_cast<int>(line.size()) - 1; i++) {
@@ -446,7 +479,7 @@ namespace Utilities {
             }
 
             std::vector<std::shared_ptr<Point> >::iterator it = findPointInList(line.begin() + i + 1, line.end(), line[i]);
-            while(it != line.end())
+            while(i > 0 && it != line.end())
             {
                 for(std::vector<std::shared_ptr<Point> >::iterator it1 = line.begin() + i + 1; it1 <= it; it1++)
                     it1->reset();
@@ -705,6 +738,24 @@ namespace Utilities {
         }
     }
 
+    void fix_lines(std::vector<std::shared_ptr<OSMWay> > &lines)
+    {
+
+        for (unsigned int i = 0; i < lines.size(); i++) {
+            //First run: remove repeated vertices (successive pairs)
+
+            fix_line(lines[i]);
+            if(lines.at(i)->getNodes().size() < 2)
+            {
+                std::shared_ptr<OSMWay> tmp = lines.at(i);
+                lines.erase(lines.begin() + i);
+                tmp.reset();
+                i--;
+            }
+
+        }
+    }
+
     void fix_lines(std::vector<std::vector<std::shared_ptr<Point> > > &lines)
     {
 
@@ -712,7 +763,7 @@ namespace Utilities {
             //First run: remove repeated vertices (successive pairs)
 
             fix_line(lines[i]);
-            if(lines.at(i).size() < 1)
+            if(lines.at(i).size() < 2)
             {
                 lines.erase(lines.begin() + i);
                 i--;
@@ -965,7 +1016,6 @@ namespace Utilities {
         my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
         mat_index->index->buildIndex();
 
-        std::cout << "0%\r";
         #pragma omp parallel for num_threads(31)
         for(unsigned int i = 0; i < mesh->getVerticesNumber(); i++)
         {
@@ -1096,7 +1146,7 @@ namespace Utilities {
             #pragma omp critical
             {
                 counter++;
-                std::cout << counter * 100 / dhm_tiff->GetDimensions()[0] << "%\r" << std::flush;
+                std::cout << counter * 100 / lines.size() << "%\r" << std::flush;
             }
         }
 
@@ -1243,10 +1293,24 @@ namespace Utilities {
                 {
                     if(isPointInsidePolygon(v, polygons.at(neighboringPolygons.at(k))))
                     {
-                        lines.at(i).erase(lines.at(i).begin() + j);
-                        v.reset();
-                        j--;
-                        break;
+                        bool onBoundary = false;
+                        for(unsigned int l = 1; l < polygons.at(neighboringPolygons.at(k)).size(); l++)
+                        {
+                            std::shared_ptr<Point> p1 = polygons.at(neighboringPolygons.at(k)).at(l - 1);
+                            std::shared_ptr<Point> p2 = polygons.at(neighboringPolygons.at(k)).at(l);
+                            if(Utilities::isPointInSegment(p1.get(), p2.get(), v.get()))
+                            {
+                                onBoundary = true;
+                                break;
+                            }
+                        }
+                        if(!onBoundary)
+                        {
+                            lines.at(i).erase(lines.at(i).begin() + j);
+                            v.reset();
+                            j--;
+                            break;
+                        }
                     }
                 }
             }
@@ -1258,8 +1322,11 @@ namespace Utilities {
             }
         }
         for(unsigned int i = 0; i < lines.size(); i++)
-            if(lines.at(i).size() == 0)
+            if(lines.at(i).size() < 2)
+            {
                 lines.erase(lines.begin() + i);
+                i--;
+            }
         std::cout << std::endl;
 
     }
@@ -1401,4 +1468,28 @@ namespace Utilities {
         return closest_points;
     }
 
+    void interpolate(const unsigned char color1[], const unsigned char color2[], float fraction, unsigned char (&color)[3])
+    {
+        unsigned char r1 = color1[0];
+        unsigned char r2 = color2[0];
+        unsigned char g1 = color1[1];
+        unsigned char g2 = color2[1];
+        unsigned char b1 = color1[2];
+        unsigned char b2 = color2[2];
+        color[0] = (r2 - r1) * fraction + r1;
+        color[1] = (g2 - g1) * fraction + g1;
+        color[2] = (b2 - b1) * fraction + b1;
+    }
+
+
+    std::vector<std::string> globVector(const std::string& pattern){
+        glob_t glob_result;
+        glob(pattern.c_str(),GLOB_TILDE,nullptr, &glob_result);
+        std::vector<std::string> files;
+        for(unsigned int i = 0; i < glob_result.gl_pathc;++i)
+            files.push_back(std::string(glob_result.gl_pathv[i]));
+
+        globfree(&glob_result);
+        return files;
+    }
 }

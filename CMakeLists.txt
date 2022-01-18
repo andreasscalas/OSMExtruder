@@ -30,25 +30,36 @@ file(GLOB Srcs "${MAIN_FOLDER}/src/*.c*")
 file(GLOB Hdrs "${MAIN_FOLDER}/include/*.h")
 file(GLOB TestInPolygonSrcs "${MAIN_FOLDER}/src/*.c*")
 file(GLOB VisualiseCitySrcs "${MAIN_FOLDER}/src/*.c*")
+file(GLOB TestSrcs "${MAIN_FOLDER}/src/*.c*")
 list(REMOVE_ITEM Srcs
     "${MAIN_FOLDER}/src/testInPolygon.cpp"
     "${MAIN_FOLDER}/src/visualiseCity.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
 )
 list(REMOVE_ITEM TestInPolygonSrcs
     "${MAIN_FOLDER}/src/main.cpp"
     "${MAIN_FOLDER}/src/visualiseCity.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
 )
 list(REMOVE_ITEM VisualiseCitySrcs
     "${MAIN_FOLDER}/src/main.cpp"
     "${MAIN_FOLDER}/src/testInPolygon.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
+)
+list(REMOVE_ITEM TestSrcs
+    "${MAIN_FOLDER}/src/main.cpp"
+    "${MAIN_FOLDER}/src/testInPolygon.cpp"
+    "${MAIN_FOLDER}/src/visualiseCity.cpp"
 )
 add_subdirectory(${TRIANGLE_MESH})
 add_subdirectory(${TRIANGLE})
 set(AS_LIBRARY true)
 add_executable(${PROJECT_NAME} ${IO_srcs} ${Srcs} ${Hdrs} )
 add_executable(TestInPolygon ${IO_srcs} ${TestInPolygonSrcs} ${Hdrs} )
+add_executable(Test ${IO_srcs} ${TestSrcs} ${Hdrs} )
 target_link_libraries(${PROJECT_NAME} ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
 target_link_libraries(TestInPolygon ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
+target_link_libraries(Test ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${MAIN_FOLDER}/include/
@@ -78,20 +89,33 @@ target_include_directories(TestInPolygon PRIVATE
     ${PROJ_INCLUDE_DIRS}
 )
 
+target_include_directories(Test PRIVATE
+    ${MAIN_FOLDER}/include/
+    ${MAIN_FOLDER}/prepair/
+    ${SHAPELIB_H}
+    ${GDAL_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIR}
+    ${NANOFLANN}/include/
+    ${NANOFLANN}/examples/
+    ${TRIANGLE}
+    ${TRIANGLE_MESH}/include
+    ${RAPIDJSON_H}
+    ${PROJ_INCLUDE_DIRS}
+)
+
 find_package(VTK COMPONENTS
     vtkCommonCore
     vtkFiltersCore
     vtkInfovisCore
     vtkInteractionStyle
-#    vtkViewsQt
-#    vtkGUISupportQt
+    vtkGUISupportQt
     vtkIOLegacy
 )
 if(VTK_FOUND)
 
     include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
     add_executable(VisualiseCity ${IO_srcs} ${VisualiseCitySrcs} ${Hdrs} )
-    target_link_libraries(VisualiseCity ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${VTK_LIBRARIES} ${TINYXML_LIB} ${PROJ_LIBRARIES})
+    target_link_libraries(VisualiseCity ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES} ${VTK_LIBRARIES} )
     target_include_directories(VisualiseCity PRIVATE
         ${MAIN_FOLDER}/include/
         ${MAIN_FOLDER}/prepair/

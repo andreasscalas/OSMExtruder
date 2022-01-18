@@ -20,13 +20,13 @@ using namespace TriHelper;
 #include <fstream>
 #include <iostream>
 
-TriangleHelper::TriangleHelper(std::vector<double*> boundary, std::vector<std::vector<double*> > holes, std::vector<double *> constraints_vertices, std::vector<std::pair<unsigned int, unsigned int> > constraints_segments){
+TriangleHelper::TriangleHelper(std::vector<double*> boundary, std::vector<std::vector<double*> > holes, std::vector<double *> constraints_vertices, std::vector<std::pair<unsigned int, unsigned int> > constraints_segments, bool boundQuality){
 
     this->boundary.insert(this->boundary.end(), boundary.begin(), boundary.end());
     this->holes.insert(this->holes.end(), holes.begin(), holes.end());
     this->constraints_vertices.insert(this->constraints_vertices.end(), constraints_vertices.begin(), constraints_vertices.end());
     this->constraints_segments.insert(this->constraints_segments.end(), constraints_segments.begin(), constraints_segments.end());
-
+    this->boundQuality = boundQuality;
     launchTriangle();
 }
 
@@ -248,7 +248,10 @@ void TriangleHelper::launchTriangle(){
     out.trianglelist   = nullptr;
     out.segmentlist    = nullptr;
 
-    std::string s = "pzBYYSQ";
+    std::string s = "pzBQ";;
+    if(boundQuality)
+        s = "pzqBQ";
+
 
     triangulate(const_cast<char*>(s.c_str()), &in, &out, nullptr);
 

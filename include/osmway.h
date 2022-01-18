@@ -13,6 +13,7 @@ public:
 
     std::vector<std::shared_ptr<OSMNode> > getNodes() const;
     void setNodes(const std::vector<std::shared_ptr<OSMNode> > &value);
+    bool removeNode(std::string id);
 
     std::string getUserName() const;
     void setUserName(const std::string &value);

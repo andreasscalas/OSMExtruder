@@ -102,73 +102,43 @@ std::shared_ptr<Vertex> Edge::getOppositeVertex(std::shared_ptr<Vertex> v)
 
 std::shared_ptr<Triangle> Edge::getLeftTriangle(std::shared_ptr<Vertex>  v)
 {
-    std::shared_ptr<Vertex> v_;
-    if(v1 != nullptr && v1->getId() == v->getId())
-        v_ = v2;
-    else if(v2 != nullptr && v2->getId() == v->getId())
-        v_ = v1;
-    else
-        return nullptr;
+    std::shared_ptr<Vertex>  v_;
+    std::shared_ptr<Vertex>  v__ = this->getOppositeVertex(v);
     if(t1 != nullptr)
     {
-        std::shared_ptr<Vertex> v__ = t1->getOppositeVertex(std::make_shared<Edge>(*this));
-        Point vec1 = *v_ - *v;
-        Point vec2 = *v__ - *v;
-        Point cross = vec1 & vec2;
-        Point normal = t1->computeNormal();
-        if(cross * normal >= 0)
-        {
+        v_ = t1->getNextVertex(v);
+        if(v_->getId() == v__->getId())
             return t1;
-        }
     }
     if(t2 != nullptr)
     {
-        std::shared_ptr<Vertex> v__ = t2->getOppositeVertex(std::make_shared<Edge>(*this));
-        Point vec1 = *v_ - *v;
-        Point vec2 = *v__ - *v;
-        Point cross = vec1 & vec2;
-        Point normal = t2->computeNormal();
-        if(normal * cross >= 0)
-        {
+        v_ = t2->getNextVertex(v);
+        if(v_->getId() == v__->getId())
             return t2;
-        }
     }
+
     return nullptr;
+
 }
 
 std::shared_ptr<Triangle> Edge::getRightTriangle(std::shared_ptr<Vertex>  v)
 {
-    std::shared_ptr<Vertex> v_;
-    if(v1 != nullptr && v1->getId() == v->getId())
-        v_ = v2;
-    else if(v2 != nullptr && v2->getId() == v->getId())
-        v_ = v1;
-    else
-        return nullptr;
-    if(t1 != nullptr)
-    {
-        std::shared_ptr<Vertex> v__ = t1->getOppositeVertex(std::make_shared<Edge>(*this));
-        Point vec1 = *v_ - *v;
-        Point vec2 = *v__ - *v;
-        Point cross = vec1 & vec2;
-        Point normal = t1->computeNormal();
-        if(cross * normal <= 0)
-        {
-            return t1;
-        }
-    }
-    if(t2 != nullptr)
-    {
-        std::shared_ptr<Vertex> v__ = t2->getOppositeVertex(std::make_shared<Edge>(*this));
-        Point vec1 = *v_ - *v;
-        Point vec2 = *v__ - *v;
-        Point cross = vec1 & vec2;
-        Point normal = t2->computeNormal();
-        if(normal * cross <= 0)
-        {
-            return t2;
-        }
-    }
+
+    if(t1 != nullptr && t1->getPreviousVertex(v)->getId() == this->getOppositeVertex(v)->getId())
+        return t1;
+    if(t2 != nullptr && t2->getPreviousVertex(v)->getId() == this->getOppositeVertex(v)->getId())
+        return t2;
+
+    return nullptr;
+
+}
+
+std::shared_ptr<Triangle> Edge::getOppositeTriangle(std::shared_ptr<Triangle> t)
+{
+    if(t->getId() == t1->getId())
+        return t2;
+    if(t->getId() == t2->getId())
+        return t1;
     return nullptr;
 }
 
@@ -277,6 +247,12 @@ bool Edge::removeInfo(unsigned int position)
         return true;
     }
     return false;
+}
+
+bool Edge::clearInfo()
+{
+    information.clear();
+    return true;
 }
 
 unsigned int Edge::getId() const

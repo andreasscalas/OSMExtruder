@@ -36,59 +36,6 @@ int main(int argc, char *argv[])
         return 4;
     }
 
-    std::vector<std::shared_ptr<OSMNode> > nodes;
-    std::vector<std::shared_ptr<OSMWay> > arcs;
-    std::vector<std::shared_ptr<OSMRelation> > relations;
-    int out = Utilities::loadOSM("/home/andreas/Scrivania/Matera/map.osm", nodes, arcs, relations);
-
-    std::vector<std::shared_ptr<OSMWay> > buildings_arcs;
-    std::vector<std::shared_ptr<OSMWay> > streets_arcs;
-    //FILTRARE ARCHI IN BOUNDARY E STRADE
-    /****Loading and preprocessing base polygons of buildings****/
-    std::vector<std::vector<std::shared_ptr<Point> > > boundaries, streets;
-
-    if(out < 0)
-        return out;
-
-    for(unsigned int i = 0; i < arcs.size(); i++)
-    {
-        if(arcs.at(i)->checkTag(std::make_pair("building","")))
-            buildings_arcs.push_back(arcs.at(i));
-
-        if(arcs.at(i)->checkTag(std::make_pair("highway","")))
-            streets_arcs.push_back(arcs.at(i));
-    }
-
-
-    std::vector<std::vector<std::shared_ptr<Point> > > arcs_points;
-    for(unsigned int i = 0; i < streets_arcs.size(); i++)
-    {
-        std::vector<std::shared_ptr<Point> > arc_points;
-        std::vector<std::shared_ptr<OSMNode> > arc_nodes = streets_arcs.at(i)->getNodes();
-        for(unsigned int j = 0; j < arc_nodes.size(); j++)
-            arc_points.push_back(arc_nodes.at(j)->getCoordinates());
-        arcs_points.push_back(arc_points);
-    }
-
-    for(unsigned int i = 0; i < buildings_arcs.size(); i++)
-    {
-
-        std::vector<std::shared_ptr<Point> > boundary;
-        std::vector<std::shared_ptr<OSMNode> > nodes = buildings_arcs.at(i)->getNodes();
-        for(unsigned int j = 0; j < nodes.size() - 1; j++)
-            boundary.push_back(nodes.at(j)->getCoordinates());
-        boundaries.push_back(boundary);
-
-    }
-
-    boundaries.clear();
-    std::vector<std::vector<unsigned int> > triangles;
-    Utilities::load_shapefile_shp(argv[1], boundaries);
-    std::cout << "Loaded " << boundaries.size() << " buildings' bases" << std::endl;
-    /*Utilities::load_shapefile_shp(argv[2], streets);
-    std::cout << "Loaded " << streets.size() << " streets' segments" << std::endl;*/
-
-
     std::cout << "Loading DTM" << std::endl;
     GeoTiff* dtm_tiff = new GeoTiff(argv[3]);
     std::cout << "Loading DSM" << std::endl;
@@ -102,6 +49,116 @@ int main(int argc, char *argv[])
     Point max(geoTransform[0] + dtm_tiff->GetDimensions()[0] * geoTransform[1],
               geoTransform[3],
               0);
+
+    std::vector<std::vector<std::shared_ptr<Point> > > boundaries, streets;
+    std::vector<std::vector<unsigned int> > triangles;
+    Utilities::load_shapefile_shp(argv[1], boundaries);
+    std::cout << "Loaded " << boundaries.size() << " buildings' bases" << std::endl;
+    /*Utilities::load_shapefile_shp(argv[2], streets);
+    std::cout << "Loaded " << streets.size() << " streets' segments" << std::endl;*/
+    std::vector<std::shared_ptr<OSMNode> > nodes;
+    std::vector<std::shared_ptr<OSMWay> > arcs;
+    std::vector<std::shared_ptr<OSMRelation> > relations;
+    int out = Utilities::loadOSM("/home/andreas/Scrivania/Matera/map.osm", nodes, arcs, relations);
+
+    std::vector<std::shared_ptr<OSMWay> > buildings_arcs;
+    std::vector<std::shared_ptr<OSMWay> > streets_arcs;
+    /****Loading and preprocessing base polygons of buildings****/
+
+    if(out < 0)
+        return out;
+
+    for(unsigned int i = 0; i < arcs.size(); i++)
+    {
+        bool should_delete = false;
+        for(unsigned int j = 0; j < arcs.at(i)->getNodes().size(); j++)
+        {
+            if(arcs.at(i)->getNodes().at(j)->getCoordinates()->getX() < min.getX() ||
+               arcs.at(i)->getNodes().at(j)->getCoordinates()->getY() < min.getY() ||
+               arcs.at(i)->getNodes().at(j)->getCoordinates()->getZ() < min.getZ() ||
+               arcs.at(i)->getNodes().at(j)->getCoordinates()->getX() > max.getX() ||
+               arcs.at(i)->getNodes().at(j)->getCoordinates()->getY() > max.getY() ||
+               arcs.at(i)->getNodes().at(j)->getCoordinates()->getZ() > max.getZ() )
+            {
+                should_delete = true;
+                break;
+            }
+        }
+        if(should_delete)
+        {
+            for(unsigned int j = 0; j < arcs.at(i)->getNodes().size(); j++)
+            {
+                arcs.at(i)->getNodes().at(j)->getCoordinates().reset();
+                arcs.at(i)->getNodes().at(j).reset();
+            }
+            arcs.erase(arcs.begin() + i);
+            i--;
+        } else
+        {
+            if(arcs.at(i)->checkTag(std::make_pair("building","")))
+                buildings_arcs.push_back(arcs.at(i));
+
+            if(arcs.at(i)->checkTag(std::make_pair("highway","")) && (!arcs.at(i)->checkTag(std::make_pair("area","")) || arcs.at(i)->checkTag(std::make_pair("area","no"))))
+                streets_arcs.push_back(arcs.at(i));
+        }
+    }
+
+    Utilities::fix_lines(streets_arcs);
+
+    std::vector<std::vector<std::shared_ptr<Point> > > arcs_points;
+    for(unsigned int i = 0; i < streets_arcs.size(); i++)
+    {
+        std::vector<std::shared_ptr<Point> > arc_points;
+        std::vector<std::shared_ptr<OSMNode> > arc_nodes = streets_arcs.at(i)->getNodes();
+        for(unsigned int j = 0; j < arc_nodes.size(); j++)
+            arc_points.push_back(arc_nodes.at(j)->getCoordinates());
+        arcs_points.push_back(arc_points);
+    }
+
+
+
+//    for(unsigned int i = 0; i < buildings_arcs.size(); i++)
+//    {
+
+//        std::vector<std::shared_ptr<Point> > boundary;
+//        std::vector<std::shared_ptr<OSMNode> > nodes = buildings_arcs.at(i)->getNodes();
+//        for(unsigned int j = 0; j < nodes.size() - 1; j++)
+//            boundary.push_back(nodes.at(j)->getCoordinates());
+//        boundaries.push_back(boundary);
+
+//    }
+
+//    boundaries.clear();
+
+
+    for(unsigned int i = 0; i < boundaries.size(); i++)
+    {
+        bool should_delete = false;
+        for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
+        {
+            if(boundaries.at(i).at(j)->getX() < min.getX() ||
+               boundaries.at(i).at(j)->getY() < min.getY() ||
+               boundaries.at(i).at(j)->getZ() < min.getZ() ||
+               boundaries.at(i).at(j)->getX() > max.getX() ||
+               boundaries.at(i).at(j)->getY() > max.getY() ||
+               boundaries.at(i).at(j)->getZ() > max.getZ() )
+            {
+                should_delete = true;
+                break;
+            }
+        }
+        if(should_delete)
+        {
+            for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
+            {
+                boundaries.at(i).at(j).reset();
+            }
+            boundaries.erase(boundaries.begin() + i);
+            i--;
+        }
+    }
+
+
     std::shared_ptr<Point> origin = std::make_shared<Point>(0,0,0);
     unsigned int points_number = 0;
 
@@ -129,7 +186,8 @@ int main(int argc, char *argv[])
     }
     double city_size = (max - min).norm();
     (*origin) /= points_number;
-
+    std::cout << city_size << std::endl;
+    origin->print(std::cout);
     for(unsigned int i = 0; i < boundaries.size(); i++)
         for(unsigned int j = 0; j < boundaries.at(i).size(); j++)
         {
@@ -165,15 +223,27 @@ int main(int argc, char *argv[])
         }
     }
 
-    Utilities::fix_lines(arcs_points);
+    //Utilities::fix_lines(arcs_points);
+    std::cout << "OSMID-Points association" << std::endl;
 
     std::cout << "Refining lines:" << std::endl;
     Utilities::refineLines(arcs_points, dtm_tiff, city_size, *origin);
-
+    for(unsigned int i = 0; i < arcs_points.size(); i++)
+        if(arcs_points.at(i).size() == 1)
+        {
+            std::cout <<"Found singlet" << std::endl;
+            exit(1312);
+        }
     std::cout << "Removing inserted critical vertices:" << std::endl;
+
     Utilities::removeLinePointsInPolygons(arcs_points, boundaries);
 
-
+    for(unsigned int i = 0; i < arcs_points.size(); i++)
+        if(arcs_points.at(i).size() == 1)
+        {
+            std::cout <<"Found singlet" << std::endl;
+            exit(1312);
+        }
     std::vector<std::pair<unsigned int, unsigned int> > keptClippings = Utilities::removeSegmentsIntersectingPolygons(arcs_points, boundaries);
 
     TriangleMesh* mesh = new TriangleMesh();
@@ -203,10 +273,8 @@ int main(int argc, char *argv[])
     std::cout << "Ended" << std::endl << "Creating triangulation:" << std::endl;
 
     mesh->triangulate(main_triangulation_boundaries, arcs_points);
-    mesh->save("blublu.ply");
+    mesh->save("blublu.ply", 15);
 
-    std::cout << "Associating height to buildings" << std::endl;
-    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > bases_elevations = Utilities::extractPolygonsHeights1(main_triangulation_boundaries, dtm_tiff, city_size, *origin);
 
     for(unsigned int i = 0; i < keptClippings.size(); i++)
     {
@@ -224,34 +292,45 @@ int main(int argc, char *argv[])
         }
     }
 
+
+    std::cout << "Associating height to buildings" << std::endl;
+    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > bases_elevations = Utilities::extractPolygonsHeights1(main_triangulation_boundaries, dtm_tiff, city_size, *origin);
+
     unsigned int reachedEdgeId = mesh->getEdgesNumber();
     unsigned int reachedTriangleId = mesh->getTrianglesNumber();
 
 
-    for(unsigned int i = 1; i < main_triangulation_boundaries.size(); i++)
+    for(unsigned int i = 0; i < main_triangulation_boundaries.size(); i++)
     {
 
+        std::reverse(main_triangulation_boundaries.at(i).begin(), main_triangulation_boundaries.at(i).end());
         std::vector<unsigned int> shell_triangles;
         unsigned int size = main_triangulation_boundaries.at(i).size();
         std::map<std::shared_ptr<Vertex>, std::vector<std::shared_ptr<Edge> > > vertices_edges;
 
         for(unsigned int j = 0; j < size; j++)
         {
+
             std::shared_ptr<Vertex> v1 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(i).at(j));
             std::shared_ptr<Vertex> v2 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(i).at((j + 1) % size));
             std::vector<std::shared_ptr<Vertex> > shortestPath = Utilities::dijkstra(v1, v2);
             if(shortestPath.size() > 1)
             {
-                std::cout << "Non-existent vertex catched: adding to polygon " << i << " " << j<< std::endl;
+//                std::cout << "Non-existent vertices catched: adding to polygon " << i << " " << j<< std::endl;
+//                std::cout << "Original edge: " << std::endl;
+//                v1->print(std::cout);
+//                v2->print(std::cout);
+//                for(unsigned int k = 0; k < shortestPath.size(); k++)
+//                    shortestPath.at(k)->print(std::cout);
                 main_triangulation_boundaries.at(i).insert(main_triangulation_boundaries.at(i).begin() + (j + 1) % size,
                                                            shortestPath.begin(),
                                                            shortestPath.begin() + shortestPath.size() - 1);
                 size += shortestPath.size() - 1;
             } else if(shortestPath.size() < 1){
+                std::cerr << "Impossible case" << std::endl;
 
                 for(unsigned int j = 0; j < size; j++)
                     main_triangulation_boundaries.at(i).at(j)->print(std::cerr,BracketsType::NONE, " ");
-                std::cerr << "Impossible case" << std::endl;
                 v1->print(std::cerr);
                 v2->print(std::cerr);
                 for(unsigned int k = 0; k < main_triangulation_boundaries.at(i).size(); k++)
@@ -439,6 +518,7 @@ int main(int argc, char *argv[])
 
     }
 
+
     std::cout << "Associating heights to buildings." << std::endl;
     float** elevations = dtm_tiff->GetRasterBand(1);
     float** heights = dsm_tiff->GetRasterBand(1);
@@ -446,6 +526,19 @@ int main(int argc, char *argv[])
     std::cout << "Ended" << std::endl << "Adapting heights to DTM" << std::endl;
     Utilities::associateHeights(mesh, dtm_tiff, city_size, *origin);
     std::cout << "Ended" << std::endl;
+
+
+
+//        std::shared_ptr<Vertex> v0 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(0).at(0));
+//        std::shared_ptr<Vertex> v1 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(0).at(1));
+//        std::shared_ptr<Vertex> v2 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(0).at(2));
+//        std::shared_ptr<Vertex> v3 = static_pointer_cast<Vertex>(main_triangulation_boundaries.at(0).at(3));
+//        std::shared_ptr<Vertex> v0_ = mesh->addNewVertex(v0->getX(), v0->getY(), 0);
+//        std::shared_ptr<Vertex> v1_ = mesh->addNewVertex(v1->getX(), v1->getY(), 0);
+//        std::shared_ptr<Vertex> v2_ = mesh->addNewVertex(v2->getX(), v2->getY(), 0);
+//        std::shared_ptr<Vertex> v3_ = mesh->addNewVertex(v3->getX(), v3->getY(), 0);
+
+
 //    delete dtm_tiff;
 //    delete dsm_tiff;
     //De-normalise boundaries points
@@ -498,7 +591,10 @@ int main(int argc, char *argv[])
             {
                 main_triangulation_boundaries.at(i).at(j)->setZ(elevation_mean);
             } else
-                main_triangulation_boundaries.at(i).at(j)->setZ(height_mean);
+                if(i == 0)
+                    main_triangulation_boundaries.at(i).at(j)->setZ(0);
+                else
+                    main_triangulation_boundaries.at(i).at(j)->setZ(height_mean);
         }
     }
     mesh->save("base_triangulated.ply", 15);
@@ -510,21 +606,25 @@ int main(int argc, char *argv[])
             delete[] heights[i];
 
 
-    ofstream annotationFile("streets.ant");
-    rapidjson::StringBuffer s;
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
-    s.Clear();
-    writer.Reset(s);
+
+
+
+    std::cout <<"Ended!" << std::endl;
+
+    std::cout <<"Writing annotations." << std::endl;
+    unsigned char building_color[] = {255, 215, 0};
+    ofstream annotationFile("buildings.ant");
+    rapidjson::StringBuffer s_base;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s_base);
+    writer.Reset(s_base);
     writer.StartObject();
     writer.Key("annotations");
     writer.StartArray();
-    unsigned char building_color[] = {255, 215, 0};
-    unsigned char street_color[] = {123, 117, 107};
+
     for(unsigned int i = 1; i < main_triangulation_boundaries.size(); i++)
     {
         std::vector<std::shared_ptr<Point> > boundary(main_triangulation_boundaries.at(i).begin(),
                                       main_triangulation_boundaries.at(i).begin() + main_triangulation_boundaries.at(i).size() / 2);
-        std::reverse(boundary.begin(), boundary.end());
         writer.StartObject();
         writer.Key("id");
         writer.Uint(i - 1);
@@ -565,6 +665,29 @@ int main(int argc, char *argv[])
         writer.EndArray();
         writer.EndObject();
     }
+
+    writer.EndArray();
+    writer.EndObject();
+    if(annotationFile.is_open())
+    {
+        annotationFile << s_base.GetString();
+        annotationFile.close();
+    }
+
+    annotationFile.open("streets.ant");
+    s_base.Clear();
+    writer.Reset(s_base);
+    writer.StartObject();
+    writer.Key("annotations");
+    writer.StartArray();
+    unsigned char street_color[] = {0, 0, 0};
+    unsigned char green[] = {0, 255, 0};
+    unsigned char yellowgreen[] = {210,255,105};
+    unsigned char yellow[] = {255,255,0};
+    unsigned char orange[] = {255,131,0};
+    unsigned char salmon[] = {255,160,122};
+    unsigned char red[] = {255, 0, 0};
+    unsigned char violet[] = {155,38,182};
     for(unsigned int i = 0; i < arcs_points.size(); i++)
     {
 
@@ -589,7 +712,6 @@ int main(int argc, char *argv[])
 
         writer.StartArray();
         writer.StartArray();
-        double slope = 0.0;
         std::cout.precision(15);
         for(unsigned int j = 0; j < arcs_points.at(i).size(); j++)
             if(static_pointer_cast<Vertex>(arcs_points.at(i).at(j))->getId() > mesh->getVerticesNumber())
@@ -597,73 +719,143 @@ int main(int argc, char *argv[])
             else
             {
                 writer.Int(static_cast<int>(static_pointer_cast<Vertex>(arcs_points.at(i).at(j))->getId()));
-                if(j > 0)
-                {
-                    Point v = *arcs_points.at(i).at(j) - *arcs_points.at(i).at(j - 1);
-                    Point projected(v.getX(), v.getY(), 0);
-                    v /= v.norm();
-                    projected /= projected.norm();
-                    slope += v.computeAngle(projected);
-                }
             }
 
         writer.EndArray();
         writer.EndArray();
-        writer.Key("attributes");
-        writer.StartArray();
-
-        if(arcs_points.at(i).size() > 1)
-        {
-            slope /= arcs_points.at(i).size() - 1.0;
-            writer.StartObject();
-            writer.Key("id");
-            writer.Uint(0);
-            writer.Key("name");
-            writer.String("slope");
-            writer.Key("type");
-            writer.String("Semantic");
-            writer.Key("value");
-            writer.String(std::to_string(slope).c_str());
-            writer.EndObject();
-        }
-
-        //Add here attributes
-        writer.EndArray();
         writer.EndObject();
+
+
 
     }
     writer.EndArray();
     writer.EndObject();
+
     if(annotationFile.is_open())
     {
-        annotationFile << s.GetString();
+        annotationFile << s_base.GetString();
         annotationFile.close();
     }
 
-    std::cout << "OSMID-Points association" << std::endl;
+    std::cout <<"Computing slopes." << std::endl;
 
-    std::map<unsigned int, std::shared_ptr<Point> > osmid_point_association;
+    double overall_min_slope = 0;
+    double overall_max_slope = 0.261799;
+    ofstream streetsSlopesFile("slopes.ant");
+    rapidjson::StringBuffer s_slopes;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer1(s_slopes);
+    unsigned int counter = 0;
+    s_slopes.Clear();
+    writer1.Reset(s_slopes);
+    writer1.StartObject();
+    writer1.Key("annotations");
+    writer1.StartArray();
+    for(unsigned int i = 0; i < arcs_points.size(); i++)
+    {
+        for(unsigned int j = 1; j < arcs_points.at(i).size(); j++)
+        {
+            /************SLOPES*****************/
+            writer1.StartObject();
+            writer1.Key("id");
+            writer1.Uint(counter);
+            writer1.Key("tag");
+            writer1.String(("street edge n° " + std::to_string(counter++)).c_str());
+            writer1.Key("father");
+            writer1.Int(-1);
+            writer1.Key("level");
+            writer1.Uint(0);
+            writer1.Key("color");
+            writer1.StartArray();
+            unsigned char color[3];
+            Point v = *arcs_points.at(i).at(j) - *arcs_points.at(i).at(j - 1);
+            Point projected(v.getX(), v.getY(), 0);
+            v /= v.norm();
+            projected /= projected.norm();
+            double angle = v.computeAngle(projected);
+            Utilities::interpolate(green, red, (angle - overall_min_slope) / (overall_max_slope - overall_min_slope), color);
+
+            if(angle >= 0 && angle < 0.01745330748016422)
+            {
+                color[0] = green[0];
+                color[1] = green[1];
+                color[2] = green[2];
+            }else if(angle >= 0.01745330748016422 && angle < 0.034906615)
+            {
+                color[0] = yellowgreen[0];
+                color[1] = yellowgreen[1];
+                color[2] = yellowgreen[2];
+            }else if(angle >= 0.034906615 && angle < 0.06981323)
+            {
+                color[0] = yellow[0];
+                color[1] = yellow[1];
+                color[2] = yellow[2];
+            }else if(angle >= 0.06981323 && angle < 0.13962646)
+            {
+                color[0] = orange[0];
+                color[1] = orange[1];
+                color[2] = orange[2];
+            }else if(angle >= 0.13962646 && angle < 0.27925292)
+            {
+                color[0] = salmon[0];
+                color[1] = salmon[1];
+                color[2] = salmon[2];
+            } else
+            {
+                color[0] = violet[0];
+                color[1] = violet[1];
+                color[2] = violet[2];
+            }
+            writer1.Uint(color[0]);
+            writer1.Uint(color[1]);
+            writer1.Uint(color[2]);
+            writer1.EndArray();
+            writer1.Key("type");
+            writer1.String("Line");
+            writer1.Key("polylines");
+
+            writer1.StartArray();
+            writer1.StartArray();
+
+            for(unsigned int j = 0; j < arcs_points.at(i).size(); j++)
+                if(static_pointer_cast<Vertex>(arcs_points.at(i).at(j))->getId() > mesh->getVerticesNumber())
+                    std::cout << "Found deleted vertex in street: " << i << " " << j << std::endl;
+                else
+                {
+                    writer1.Int(static_cast<int>(static_pointer_cast<Vertex>(arcs_points.at(i).at(j))->getId()));
+                }
+
+            writer1.EndArray();
+            writer1.EndArray();
+            writer1.EndObject();
+        }
+    }
+    writer1.EndArray();
+    writer1.EndObject();
+    if(streetsSlopesFile.is_open())
+    {
+        streetsSlopesFile << s_slopes.GetString();
+        streetsSlopesFile.close();
+    }
+
+    std::map<std::string, std::shared_ptr<Point> > osmid_point_association;
     for(unsigned int i = 0; i < arcs_points.size(); i++)
         for(unsigned int j = 0; j < arcs_points.at(i).size(); j++)
             if(arcs_points.at(i).at(j)->getInfo() != nullptr)
             {
                 OSMNode* n = static_cast<OSMNode*>(arcs_points.at(i).at(j)->getInfo());
                 if(n != nullptr)
-                    osmid_point_association.insert(std::make_pair(std::atoi(n->getId().c_str()), arcs_points.at(i).at(j)));
+                    osmid_point_association.insert(std::make_pair(n->getId(), arcs_points.at(i).at(j)));
                 else
                     std::cout << "nullptr: " << i << " " << j << std::endl;
-            } else
-                std::cout << "no info: " << i << " " << j << std::endl;
-
-    std::cout << "OSMID-Points associations size: " << osmid_point_association.size() << std::endl;
+            }
     std::cout << "Beginning slopes computation" << std::endl;
     ofstream slopesFile("attributes.json");
-    s.Clear();
-    writer.Reset(s);
+    s_base.Clear();
+    writer.Reset(s_base);
     writer.StartObject();
     writer.Key("Arcs_attributes");
     writer.StartArray();
-    unsigned int counter = 0;
+    counter = 0;
     for(unsigned int i = 0; i < streets_arcs.size(); i++)
     {
         std::vector<std::shared_ptr<OSMNode> > arc_nodes = streets_arcs.at(i)->getNodes();
@@ -673,27 +865,19 @@ int main(int argc, char *argv[])
             double min_slope = std::numeric_limits<double>::max(), mean_slope = 0.0, max_slope = -std::numeric_limits<double>::max();
             std::shared_ptr<OSMNode> n1 = arc_nodes.at(j - 1);
             std::shared_ptr<OSMNode> n2 = arc_nodes.at(j);
-            unsigned int id1;
-            stringstream sstream(n1->getId());
-            sstream >> id1;
-            unsigned int id2;
-            sstream.clear();
-            sstream.str(n2->getId());
-            sstream >> id2;
 
-
-            std::map<unsigned int, std::shared_ptr<Point> >::iterator it1 = osmid_point_association.find(id1);
-            std::map<unsigned int, std::shared_ptr<Point> >::iterator it2 = osmid_point_association.find(id2);
+            std::map<std::string, std::shared_ptr<Point> >::iterator it1 = osmid_point_association.find(n1->getId());
+            std::map<std::string, std::shared_ptr<Point> >::iterator it2 = osmid_point_association.find(n2->getId());
             std::shared_ptr<Vertex> v1;
             std::shared_ptr<Vertex> v2;
             if(it1 != osmid_point_association.end() && it2 != osmid_point_association.end())
             {
-                v1 = static_pointer_cast<Vertex>(osmid_point_association.at(id1));
-                v2 = static_pointer_cast<Vertex>(osmid_point_association.at(id2));
+                v1 = static_pointer_cast<Vertex>(osmid_point_association.at(n1->getId()));
+                v2 = static_pointer_cast<Vertex>(osmid_point_association.at(n2->getId()));
             } else
             {
                 std::cerr << "Arc id " << streets_arcs.at(i)->getId() << std::endl;
-                std::cerr << "Pair (" << id1 << "," << id2 << ")" << std::endl;
+                std::cerr << "Pair (" << n1->getId() << "," << n2->getId() << "); ("  << n1->getId() << "," << n2->getId() << std::endl;
                 std::cerr << "No id vertex association" << std::endl;
                 std::cerr << "Position: " << i << " " << j << std::endl;
                 if(it1 == osmid_point_association.end())
@@ -705,7 +889,7 @@ int main(int argc, char *argv[])
             }
             if(v1 == nullptr || v2 == nullptr)
             {
-                std::cerr << "Pair (" << id1 << "," << id2 << ")" << std::endl;
+                std::cerr << "Pair (" << n1->getId() << "," << n2->getId() << ")" << std::endl;
                 std::cerr << "Position: " << i << " " << j << std::endl;
                 std::cerr << "Could not find vertex" << std::endl;
                 counter++;
@@ -713,9 +897,9 @@ int main(int argc, char *argv[])
             }
             writer.StartObject();
             writer.Key("Node1");
-            writer.Uint(id1);
+            writer.String(n1->getId().c_str());
             writer.Key("Node2");
-            writer.Uint(id2);
+            writer.String(n2->getId().c_str());
             std::vector<std::shared_ptr<Vertex> > path = Utilities::dijkstra(v1, v2);
             path.insert(path.begin(), v1);
             for(unsigned int k = 1; k < path.size(); k++)
@@ -724,7 +908,8 @@ int main(int argc, char *argv[])
                 Point projected(v.getX(), v.getY(), 0);
                 v /= v.norm();
                 projected /= projected.norm();
-                double angle = v.computeAngle(projected);
+                double sign = path.at(k - 1)->getZ() > path.at(k)->getZ() ? -1 : 1;
+                double angle = sign * v.computeAngle(projected);
                 mean_slope += angle;
                 if(angle < min_slope)
                     min_slope = angle;
@@ -759,13 +944,12 @@ int main(int argc, char *argv[])
 
         }
     }
-    std::cout << counter << " motherfucker" << std::endl;
     std::cout << std::endl;
     writer.EndArray();
     writer.EndObject();
     if(slopesFile.is_open())
     {
-        slopesFile << s.GetString();
+        slopesFile << s_base.GetString();
         slopesFile.close();
     }
 

@@ -22,6 +22,7 @@ public:
     std::shared_ptr<Vertex>  getOppositeVertex(std::shared_ptr<Vertex>  v);
     std::shared_ptr<Triangle> getLeftTriangle(std::shared_ptr<Vertex> );
     std::shared_ptr<Triangle> getRightTriangle(std::shared_ptr<Vertex> v);
+    std::shared_ptr<Triangle> getOppositeTriangle(std::shared_ptr<Triangle> v);
     bool hasVertex(std::shared_ptr<Vertex> );
 
     std::shared_ptr<Vertex> getV1() const;
@@ -45,6 +46,7 @@ public:
     int searchInfo(void*);
     bool removeInfo(void*);
     bool removeInfo(unsigned int);
+    bool clearInfo();
     unsigned int getId() const;
     void setId(unsigned int newId);
 

@@ -43,6 +43,7 @@ public:
     int searchInfo(void*);
     bool removeInfo(void*);
     bool removeInfo(unsigned int);
+    bool clearInfo();
 
     unsigned int getId() const;
     void setId(unsigned int newId);

@@ -28,7 +28,10 @@ public:
     void setE2(std::shared_ptr<Edge> newE2);
     std::shared_ptr<Edge> getE3() const;
     void setE3(std::shared_ptr<Edge> newE3);
+    std::shared_ptr<Vertex> getPreviousVertex(std::shared_ptr<Vertex> v);
     std::shared_ptr<Vertex> getNextVertex(std::shared_ptr<Vertex> v);
+    std::shared_ptr<Edge> getPreviousEdge(std::shared_ptr<Edge> v);
+    std::shared_ptr<Edge> getNextEdge(std::shared_ptr<Edge> v);
     const std::vector<void *> &getInformation() const;
     void setInformation(const std::vector<void *> &newInformation);
     const std::vector<FlagType> &getAssociatedFlags() const;
@@ -51,9 +54,10 @@ public:
     bool removeFlag(FlagType);
     bool removeFlag(unsigned int);
     bool addInformation(void*);
-    int searchInfo(void*);
-    bool removeInfo(void*);
-    bool removeInfo(unsigned int);
+    int searchInformation(void*);
+    bool removeInformation(void*);
+    bool removeInformation(unsigned int);
+    bool clearInformation();
 
     void print(std::ostream&);
 
