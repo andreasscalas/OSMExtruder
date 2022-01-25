@@ -71,7 +71,7 @@ bool AnnotationFileManager::writeAnnotations(std::string fileName)
                 std::vector<std::shared_ptr<Triangle>> triangles = a->getTriangles();
                 writer.StartArray();
                 for(unsigned int i = 0; i < triangles.size(); i++){
-                    writer.Int(triangles[i]->getId());
+                    writer.String(triangles[i]->getId().c_str());
                 }
                 writer.EndArray();
                 writer.EndObject();
@@ -252,6 +252,40 @@ bool AnnotationFileManager::readAnnotations(string fileName)
 
                                 }
 
+                                assert(jsonAnnotation.HasMember("attributes"));
+                                assert(jsonAnnotation["attributes"].IsArray());
+                                rapidjson::Value& attributes = jsonAnnotation["attributes"];
+
+                                for(rapidjson::SizeType j = 0; j < attributes.Size(); j++){
+                                    rapidjson::Value& jsonAttribute = attributes[j];
+                                    assert(jsonAttribute.IsObject());
+                                    assert(jsonAttribute.HasMember("id"));
+                                    assert(jsonAttribute.HasMember("type"));
+                                    assert(jsonAttribute.HasMember("name"));
+                                    assert(jsonAttribute.HasMember("value"));
+                                    assert(jsonAttribute["type"].IsString());
+                                    assert(jsonAttribute["name"].IsString());
+                                    unsigned int attributeID = jsonAttribute["id"].GetUint();
+                                    string attributeType = jsonAttribute["type"].GetString();
+                                    string attributeName = jsonAttribute["name"].GetString();
+                                    Attribute* attribute;
+
+                                    if(attributeType.compare("Geometric") == 0){
+                                        assert(false);
+                                    } else if(attributeType.compare("Semantic") == 0){
+                                        attribute = new SemanticAttribute();
+                                        string value = jsonAttribute["value"].GetString();
+                                        attribute->setValue(value);
+
+                                    } else {
+                                        assert(false);
+                                    }
+
+                                    attribute->setId(attributeID);
+                                    attribute->setKey(attributeName);
+                                    annotation->addAttribute(attribute);
+
+                                }
 
                                 annotation->setMesh(mesh);
                                 mesh->addAnnotation(annotation);
@@ -445,7 +479,40 @@ std::vector<std::shared_ptr<Annotation> > AnnotationFileManager::readAndStoreAnn
 
                                 }
 
+                                assert(jsonAnnotation.HasMember("attributes"));
+                                assert(jsonAnnotation["attributes"].IsArray());
+                                rapidjson::Value& attributes = jsonAnnotation["attributes"];
 
+                                for(rapidjson::SizeType j = 0; j < attributes.Size(); j++){
+                                    rapidjson::Value& jsonAttribute = attributes[j];
+                                    assert(jsonAttribute.IsObject());
+                                    assert(jsonAttribute.HasMember("id"));
+                                    assert(jsonAttribute.HasMember("type"));
+                                    assert(jsonAttribute.HasMember("name"));
+                                    assert(jsonAttribute.HasMember("value"));
+                                    assert(jsonAttribute["type"].IsString());
+                                    assert(jsonAttribute["name"].IsString());
+                                    unsigned int attributeID = jsonAttribute["id"].GetUint();
+                                    string attributeType = jsonAttribute["type"].GetString();
+                                    string attributeName = jsonAttribute["name"].GetString();
+                                    Attribute* attribute;
+
+                                    if(attributeType.compare("Geometric") == 0){
+                                        assert(false);
+                                    } else if(attributeType.compare("Semantic") == 0){
+                                        attribute = new SemanticAttribute();
+                                        string value = jsonAttribute["value"].GetString();
+                                        attribute->setValue(value);
+
+                                    } else {
+                                        assert(false);
+                                    }
+
+                                    attribute->setId(attributeID);
+                                    attribute->setKey(attributeName);
+                                    annotation->addAttribute(attribute);
+
+                                }
                                 annotation->setMesh(mesh);
                                 annotations.push_back(annotation);
                             }else

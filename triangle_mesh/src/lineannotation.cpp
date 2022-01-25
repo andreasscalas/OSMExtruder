@@ -40,7 +40,7 @@ void LineAnnotation::printJson(rapidjson::PrettyWriter<rapidjson::StringBuffer>&
     for(unsigned int i = 0; i < polyLines.size(); i++){
         writer.StartArray();
         for(unsigned j = 0; j < polyLines[i].size(); j++)
-            writer.Int(static_cast<int>(polyLines[i][j]->getId()));
+            writer.Int(stoi(polyLines[i][j]->getId()));
         writer.EndArray();
     }
     writer.EndArray();

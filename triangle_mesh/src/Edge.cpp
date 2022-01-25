@@ -3,7 +3,7 @@
 
 Edge::Edge()
 {
-    setId(-1);
+    setId("-1");
     v1 = nullptr;
     v2 = nullptr;
     t1 = nullptr;
@@ -12,7 +12,7 @@ Edge::Edge()
 
 Edge::Edge(std::shared_ptr<Vertex> v1, std::shared_ptr<Vertex> v2)
 {
-    setId(-1);
+    setId("-1");
     setV1(v1);
     setV2(v2);
     t1 = nullptr;
@@ -92,9 +92,9 @@ std::shared_ptr<Vertex> Edge::getCommonVertex(std::shared_ptr<Edge> e)
 
 std::shared_ptr<Vertex> Edge::getOppositeVertex(std::shared_ptr<Vertex> v)
 {
-    if(v1 != nullptr && v1->getId() == v->getId())
+    if(v1 != nullptr && v1->getId().compare( v->getId()) == 0)
         return v2;
-    if(v2 != nullptr && v2->getId() == v->getId())
+    if(v2 != nullptr && v2->getId().compare( v->getId()) == 0)
         return v1;
 
     return nullptr;
@@ -107,13 +107,13 @@ std::shared_ptr<Triangle> Edge::getLeftTriangle(std::shared_ptr<Vertex>  v)
     if(t1 != nullptr)
     {
         v_ = t1->getNextVertex(v);
-        if(v_->getId() == v__->getId())
+        if(v_->getId().compare( v__->getId()) == 0)
             return t1;
     }
     if(t2 != nullptr)
     {
         v_ = t2->getNextVertex(v);
-        if(v_->getId() == v__->getId())
+        if(v_->getId().compare( v__->getId()) == 0)
             return t2;
     }
 
@@ -124,9 +124,9 @@ std::shared_ptr<Triangle> Edge::getLeftTriangle(std::shared_ptr<Vertex>  v)
 std::shared_ptr<Triangle> Edge::getRightTriangle(std::shared_ptr<Vertex>  v)
 {
 
-    if(t1 != nullptr && t1->getPreviousVertex(v)->getId() == this->getOppositeVertex(v)->getId())
+    if(t1 != nullptr && t1->getPreviousVertex(v)->getId().compare( this->getOppositeVertex(v)->getId()) == 0)
         return t1;
-    if(t2 != nullptr && t2->getPreviousVertex(v)->getId() == this->getOppositeVertex(v)->getId())
+    if(t2 != nullptr && t2->getPreviousVertex(v)->getId().compare( this->getOppositeVertex(v)->getId()) == 0)
         return t2;
 
     return nullptr;
@@ -135,16 +135,16 @@ std::shared_ptr<Triangle> Edge::getRightTriangle(std::shared_ptr<Vertex>  v)
 
 std::shared_ptr<Triangle> Edge::getOppositeTriangle(std::shared_ptr<Triangle> t)
 {
-    if(t->getId() == t1->getId())
+    if(t->getId().compare( t1->getId()) == 0)
         return t2;
-    if(t->getId() == t2->getId())
+    if(t->getId().compare( t2->getId()) == 0)
         return t1;
     return nullptr;
 }
 
 bool Edge::hasVertex(std::shared_ptr<Vertex>  v)
 {
-    return ((v1 != nullptr && v1->getId() == v->getId()) || (v2 != nullptr && v2->getId() == v->getId()));
+    return ((v1 != nullptr && v1->getId().compare( v->getId()) == 0) || (v2 != nullptr && v2->getId().compare( v->getId())) == 0);
 }
 
 
@@ -255,12 +255,12 @@ bool Edge::clearInfo()
     return true;
 }
 
-unsigned int Edge::getId() const
+std::string Edge::getId() const
 {
     return id;
 }
 
-void Edge::setId(unsigned int newId)
+void Edge::setId(std::string newId)
 {
     id = newId;
 }

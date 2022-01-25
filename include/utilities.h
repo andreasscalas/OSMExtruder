@@ -790,7 +790,6 @@ namespace Utilities {
         return isPointInsidePolygon(boundary1[0], boundary2);
     }
 
-
     /**
      * @brief extractPolygonsHeights1 assolutamente da ottimizzare
      * @param boundaries
@@ -798,87 +797,6 @@ namespace Utilities {
      * @return
      */
     std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights(std::vector<std::vector<std::shared_ptr<Point> > > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
-    {
-        std::vector<std::vector<std::pair<unsigned int, unsigned int> > > heights;
-        unsigned int counter = 0;
-        for(unsigned int i = 0; i < boundaries.size(); i++)
-        {
-            std::vector<std::pair<unsigned int, unsigned int> > boundary_heights;
-            heights.push_back(boundary_heights);
-        }
-        float** dhm_heights = dhm_tiff->GetRasterBand(1);
-        double* geoTransform = dhm_tiff->GetGeoTransform();
-        geoTransform[0] = (geoTransform[0] - origin.getX()) / scale_factor;  //x del punto in alto a sinistra
-        geoTransform[3] = (geoTransform[3] - origin.getY()) / scale_factor;  //y del punto in alto a sinistra
-        geoTransform[1] /= scale_factor;
-        geoTransform[5] /= scale_factor;
-
-        #pragma omp parallel for num_threads(31)
-        for(unsigned int i = 0; i < boundaries.size(); i++)
-        {
-            std::vector<std::shared_ptr<Point> > bb = bbExtraction(boundaries[i]);
-            for(unsigned int j = 0; j < dhm_tiff->GetDimensions()[0]; j++)
-                for(unsigned int k = 0; k < dhm_tiff->GetDimensions()[1]; k++)
-                {
-                    double min_x = geoTransform[0] + k * geoTransform[1] + j * geoTransform[2];
-                    double min_y = geoTransform[3] + k * geoTransform[4] + j * geoTransform[5];
-                    std::vector<std::shared_ptr<Point> > frame;
-                    frame.push_back(std::make_shared<Point>(min_x, min_y, 0));
-                    frame.push_back(std::make_shared<Point>(min_x + geoTransform[1], min_y, 0));
-                    frame.push_back(std::make_shared<Point>(frame.back()->getX(), min_y + geoTransform[5], 0));
-                    frame.push_back(std::make_shared<Point>(min_x, frame.back()->getY(), 0));
-                    frame.push_back(frame[0]);
-                    if(((*frame[0]) - (*boundaries[i][0])).norm() < std::max(((*bb[0]) - (*bb[2])).norm(), ((*frame[0]) - (*frame[2])).norm()))
-                    {
-                        if(isPointInsidePolygon(boundaries[i][0], frame) ||                                         //Se un punto del poligono è dentro al pixel del geotiff...
-                           (isPointInsidePolygon(frame[0], bb) && isPointInsidePolygon(frame[0], boundaries[i])) || //o il pixel è contenuto nel poligono...
-                           polygonsIntersect(frame, boundaries[i]))                                                 //o ancora poligono e pixel si intersecano
-                        {
-                            heights[i].push_back(std::make_pair(j, k));
-                        }
-                    }
-
-                    for(unsigned int l = 0; l < 4; l++)
-                        frame.at(l).reset();
-
-
-                }
-
-            #pragma omp critical
-            {
-                if(heights[i].size() == 0)
-                {
-                        std::cerr << "Impossible case: boundary does not include any pixel while no pixel wholly include the boundary and boundary intersects no pixel" << std::endl;
-                        std::cerr << geoTransform[0] << " " << geoTransform[1] << " " << geoTransform[2] << " " << std::endl;
-                        std::cerr << geoTransform[3] << " " << geoTransform[4] << " " << geoTransform[5] << " " << std::endl << std::flush;
-                        for(unsigned int j = 0; j < boundaries[i].size(); j++)
-                            boundaries[i][j]->print(std::cerr);
-                        exit(6);
-                }
-            }
-            #pragma omp critical
-            {
-                counter++;
-                std::cout << counter * 100 / boundaries.size() << "%\r" << std::flush;
-            }
-
-        }
-        std::cout << std::endl;
-
-        geoTransform[0] = (geoTransform[0] * scale_factor + origin.getX());  //x del punto in alto a sinistra
-        geoTransform[3] = (geoTransform[3] * scale_factor + origin.getY());  //y del punto in alto a sinistra
-        geoTransform[1] *= scale_factor;
-        geoTransform[5] *= scale_factor;
-        return heights;
-    }
-
-    /**
-     * @brief extractPolygonsHeights1 assolutamente da ottimizzare
-     * @param boundaries
-     * @param dhm_tiff
-     * @return
-     */
-    std::vector<std::vector<std::pair<unsigned int, unsigned int> > > extractPolygonsHeights1(std::vector<std::vector<std::shared_ptr<Point> > > boundaries, GeoTiff* dhm_tiff, double scale_factor, Point origin)
     {
         std::vector<std::vector<std::pair<unsigned int, unsigned int> > > heights;
         unsigned int counter = 0;
@@ -1245,6 +1163,90 @@ namespace Utilities {
 
         return shortestPath;
     }
+
+    void removeOSMWayPointsInPolygons(std::vector<std::shared_ptr<OSMWay>> &lines, std::vector<std::vector<std::shared_ptr<Point> > > polygons)
+    {
+        my_vector_of_vectors_t points_vector;
+        std::vector<unsigned int> sizes(lines.size());
+        std::map<unsigned int, unsigned int > pointPolygonLink;
+        unsigned int id = 0;
+        double meanDiagonal = 0;
+        for(unsigned int i = 0; i < polygons.size(); i++)
+        {
+            for(unsigned int j = 0; j < polygons[i].size() - 1; j++){
+                std::vector<double> point = { polygons.at(i).at(j)->getX(),
+                                              polygons.at(i).at(j)->getY(),
+                                              polygons.at(i).at(j)->getZ()};
+                points_vector.push_back(point);
+                pointPolygonLink.insert(std::make_pair(id++, i));
+            }
+            std::vector<std::shared_ptr<Point> > bb = bbExtraction(polygons[i]);
+            double diagMeasure = (*bb[2] - *bb[0]).norm();
+            meanDiagonal += diagMeasure;
+        }
+        meanDiagonal /= polygons.size();
+
+        my_kd_tree_t* mat_index = new my_kd_tree_t(3, points_vector, 10 /* max leaf */ );
+        mat_index->index->buildIndex();
+        unsigned int counter = 0;
+
+        #pragma omp parallel for num_threads(31)
+        for(unsigned int i = 0; i < lines.size(); i++)
+        {
+            std::vector<std::shared_ptr<OSMNode> > nodes = lines.at(i)->getNodes();
+            for(unsigned int j = 0; j < nodes.size(); j++){
+                std::vector<std::shared_ptr<Point> > intersections;
+                std::shared_ptr<Point> v = nodes.at(j)->getCoordinates();
+                std::vector<std::pair<size_t, double> > neighbors_distances;
+                std::vector<unsigned int> neighboringPolygons;
+                nanoflann::SearchParams params;
+                double query_point[3] = {v->getX(), v->getY(), v->getZ()};
+                neighbors_distances.clear();
+                mat_index->index->radiusSearch(query_point, meanDiagonal / 2, neighbors_distances, params);
+                for(std::vector<std::pair<size_t,double> >::iterator it = neighbors_distances.begin(); it != neighbors_distances.end(); it++){
+                    std::pair<size_t, double> p = static_cast<std::pair<long int, double> >(*it);
+                    std::vector<unsigned int>::iterator pit = std::find(neighboringPolygons.begin(), neighboringPolygons.end(), pointPolygonLink.at(p.first));
+                    if(pit == neighboringPolygons.end())
+                        neighboringPolygons.push_back(pointPolygonLink.at(p.first));
+                }
+                for(unsigned int k = 0; k < neighboringPolygons.size(); k++)
+                {
+                    if(isPointInsidePolygon(v, polygons.at(neighboringPolygons.at(k))))
+                    {
+                        bool onBoundary = false;
+                        for(unsigned int l = 1; l < polygons.at(neighboringPolygons.at(k)).size(); l++)
+                        {
+                            std::shared_ptr<Point> p1 = polygons.at(neighboringPolygons.at(k)).at(l - 1);
+                            std::shared_ptr<Point> p2 = polygons.at(neighboringPolygons.at(k)).at(l);
+                            if(Utilities::isPointInSegment(p1.get(), p2.get(), v.get()))
+                            {
+                                onBoundary = true;
+                                break;
+                            }
+                        }
+                        if(!onBoundary)
+                        {
+                            lines.at(i)->removeNode(nodes.at(j)->getId());
+                            nodes.erase(nodes.begin() + j);
+                            v.reset();
+                            j--;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            #pragma omp critical
+            {
+                counter++;
+                std::cout << counter * 100 / lines.size() << "%\r" << std::flush;
+            }
+            sizes.at(i) = nodes.size();
+        }
+
+        std::cout << std::endl;
+    }
+
 
     void removeLinePointsInPolygons(std::vector<std::vector<std::shared_ptr<Point> > > &lines, std::vector<std::vector<std::shared_ptr<Point> > > polygons)
     {

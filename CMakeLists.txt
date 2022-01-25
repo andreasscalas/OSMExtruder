@@ -24,42 +24,22 @@ set( TRIANGLE_MESH ${MAIN_FOLDER}/triangle_mesh/ )
 set( TRIANGLE ${MAIN_FOLDER}/triangle/ )
 set( NANOFLANN ${MAIN_FOLDER}/nanoflann/)
 
-
 file(GLOB IO_srcs "${MAIN_FOLDER}/include/*.h*" "${MAIN_FOLDER}/IO/*.c*")
 file(GLOB Srcs "${MAIN_FOLDER}/src/*.c*")
 file(GLOB Hdrs "${MAIN_FOLDER}/include/*.h")
-file(GLOB TestInPolygonSrcs "${MAIN_FOLDER}/src/*.c*")
-file(GLOB VisualiseCitySrcs "${MAIN_FOLDER}/src/*.c*")
-file(GLOB TestSrcs "${MAIN_FOLDER}/src/*.c*")
-list(REMOVE_ITEM Srcs
-    "${MAIN_FOLDER}/src/testInPolygon.cpp"
-    "${MAIN_FOLDER}/src/visualiseCity.cpp"
-    "${MAIN_FOLDER}/src/test.cpp"
-)
-list(REMOVE_ITEM TestInPolygonSrcs
-    "${MAIN_FOLDER}/src/main.cpp"
-    "${MAIN_FOLDER}/src/visualiseCity.cpp"
-    "${MAIN_FOLDER}/src/test.cpp"
-)
-list(REMOVE_ITEM VisualiseCitySrcs
-    "${MAIN_FOLDER}/src/main.cpp"
-    "${MAIN_FOLDER}/src/testInPolygon.cpp"
-    "${MAIN_FOLDER}/src/test.cpp"
-)
-list(REMOVE_ITEM TestSrcs
-    "${MAIN_FOLDER}/src/main.cpp"
-    "${MAIN_FOLDER}/src/testInPolygon.cpp"
-    "${MAIN_FOLDER}/src/visualiseCity.cpp"
-)
 add_subdirectory(${TRIANGLE_MESH})
 add_subdirectory(${TRIANGLE})
 set(AS_LIBRARY true)
+
+#Adding Extruder executable and dependencies
+list(REMOVE_ITEM Srcs
+    "${MAIN_FOLDER}/src/test_in_polygon.cpp"
+    "${MAIN_FOLDER}/src/visualise_city.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
+    "${MAIN_FOLDER}/src/compute_slopes.cpp"
+)
 add_executable(${PROJECT_NAME} ${IO_srcs} ${Srcs} ${Hdrs} )
-add_executable(TestInPolygon ${IO_srcs} ${TestInPolygonSrcs} ${Hdrs} )
-add_executable(Test ${IO_srcs} ${TestSrcs} ${Hdrs} )
 target_link_libraries(${PROJECT_NAME} ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
-target_link_libraries(TestInPolygon ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
-target_link_libraries(Test ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${MAIN_FOLDER}/include/
@@ -75,6 +55,16 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJ_INCLUDE_DIRS}
 )
 
+#Adding TestInPolygon executable and dependencies
+file(GLOB TestInPolygonSrcs "${MAIN_FOLDER}/src/*.c*")
+list(REMOVE_ITEM TestInPolygonSrcs
+    "${MAIN_FOLDER}/src/main.cpp"
+    "${MAIN_FOLDER}/src/visualise_city.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
+    "${MAIN_FOLDER}/src/compute_slopes.cpp"
+)
+add_executable(TestInPolygon ${IO_srcs} ${TestInPolygonSrcs} ${Hdrs} )
+target_link_libraries(TestInPolygon ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
 target_include_directories(TestInPolygon PRIVATE
     ${MAIN_FOLDER}/include/
     ${MAIN_FOLDER}/prepair/
@@ -89,6 +79,16 @@ target_include_directories(TestInPolygon PRIVATE
     ${PROJ_INCLUDE_DIRS}
 )
 
+#Adding Test executable and dependencies
+file(GLOB TestSrcs "${MAIN_FOLDER}/src/*.c*")
+list(REMOVE_ITEM TestSrcs
+    "${MAIN_FOLDER}/src/main.cpp"
+    "${MAIN_FOLDER}/src/test_in_polygon.cpp"
+    "${MAIN_FOLDER}/src/visualise_city.cpp"
+    "${MAIN_FOLDER}/src/compute_slopes.cpp"
+)
+add_executable(Test ${IO_srcs} ${TestSrcs} ${Hdrs} )
+target_link_libraries(Test ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
 target_include_directories(Test PRIVATE
     ${MAIN_FOLDER}/include/
     ${MAIN_FOLDER}/prepair/
@@ -103,6 +103,32 @@ target_include_directories(Test PRIVATE
     ${PROJ_INCLUDE_DIRS}
 )
 
+#Adding ComputeSlopes executable and dependencies
+file(GLOB ComputeSlopesSrcs "${MAIN_FOLDER}/src/*.c*")
+list(REMOVE_ITEM ComputeSlopesSrcs
+    "${MAIN_FOLDER}/src/main.cpp"
+    "${MAIN_FOLDER}/src/test.cpp"
+    "${MAIN_FOLDER}/src/test_in_polygon.cpp"
+    "${MAIN_FOLDER}/src/visualise_city.cpp"
+)
+add_executable(ComputeSlopes ${IO_srcs} ${ComputeSlopesSrcs} ${Hdrs} )
+target_link_libraries(ComputeSlopes ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES})
+target_include_directories(ComputeSlopes PRIVATE
+    ${MAIN_FOLDER}/include/
+    ${MAIN_FOLDER}/prepair/
+    ${SHAPELIB_H}
+    ${GDAL_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIR}
+    ${NANOFLANN}/include/
+    ${NANOFLANN}/examples/
+    ${TRIANGLE}
+    ${TRIANGLE_MESH}/include
+    ${RAPIDJSON_H}
+    ${PROJ_INCLUDE_DIRS}
+)
+
+#Adding VisualiseCity executable and dependencies
+
 find_package(VTK COMPONENTS
     vtkCommonCore
     vtkFiltersCore
@@ -114,6 +140,13 @@ find_package(VTK COMPONENTS
 if(VTK_FOUND)
 
     include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
+    file(GLOB VisualiseCitySrcs "${MAIN_FOLDER}/src/*.c*")
+    list(REMOVE_ITEM VisualiseCitySrcs
+        "${MAIN_FOLDER}/src/main.cpp"
+        "${MAIN_FOLDER}/src/test_in_polygon.cpp"
+        "${MAIN_FOLDER}/src/test.cpp"
+        "${MAIN_FOLDER}/src/compute_slopes.cpp"
+    )
     add_executable(VisualiseCity ${IO_srcs} ${VisualiseCitySrcs} ${Hdrs} )
     target_link_libraries(VisualiseCity ${SHAPELIB} TriangleMesh-lib Triangle-lib OpenMP::OpenMP_CXX ${GDAL_LIBRARY} ${TINYXML_LIB} ${PROJ_LIBRARIES} ${VTK_LIBRARIES} )
     target_include_directories(VisualiseCity PRIVATE

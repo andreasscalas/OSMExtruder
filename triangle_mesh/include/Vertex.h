@@ -45,12 +45,12 @@ public:
     bool removeInfo(unsigned int);
     bool clearInfo();
 
-    unsigned int getId() const;
-    void setId(unsigned int newId);
+    std::string getId() const;
+    void setId(std::string newId);
     void print(std::ostream&);
 
 protected:
-    unsigned int id;
+    std::string id;
     std::shared_ptr<Edge> e0;
     std::vector<void*> information;
     std::vector<FlagType> associated_flags;

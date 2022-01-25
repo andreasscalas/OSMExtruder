@@ -11,7 +11,7 @@ Triangle::Triangle()
 
 Triangle::Triangle(std::shared_ptr<Edge> e1, std::shared_ptr<Edge> e2, std::shared_ptr<Edge> e3)
 {
-    setId(-1);
+    setId("-1");
     setE1(e1);
     setE2(e2);
     setE3(e3);
@@ -66,11 +66,11 @@ void Triangle::setE3(std::shared_ptr<Edge> newE3)
 
 std::shared_ptr<Vertex> Triangle::getPreviousVertex(std::shared_ptr<Vertex> v)
 {
-    if(getV1()->getId() == v->getId())
+    if(getV1()->getId().compare( v->getId()) == 0)
         return getV3();
-    if(getV2()->getId() == v->getId())
+    if(getV2()->getId().compare(v->getId()) == 0)
         return getV1();
-    if(getV3()->getId() == v->getId())
+    if(getV3()->getId().compare(v->getId()) == 0)
         return getV2();
     return nullptr;
 
@@ -78,22 +78,22 @@ std::shared_ptr<Vertex> Triangle::getPreviousVertex(std::shared_ptr<Vertex> v)
 
 std::shared_ptr<Vertex> Triangle::getNextVertex(std::shared_ptr<Vertex> v)
 {
-    if(getV1()->getId() == v->getId())
+    if(getV1()->getId().compare( v->getId()) == 0)
         return getV2();
-    if(getV2()->getId() == v->getId())
+    if(getV2()->getId().compare( v->getId()) == 0)
         return getV3();
-    if(getV3()->getId() == v->getId())
+    if(getV3()->getId().compare( v->getId()) == 0)
         return getV1();
     return nullptr;
 }
 
 std::shared_ptr<Edge> Triangle::getPreviousEdge(std::shared_ptr<Edge> e)
 {
-    if(e->getId() == e1->getId())
+    if(e->getId().compare( e1->getId()) == 0)
         return e3;
-    if(e->getId() == e2->getId())
+    if(e->getId().compare( e2->getId()) == 0)
         return e1;
-    if(e->getId() == e3->getId())
+    if(e->getId().compare( e3->getId()) == 0)
         return e2;
     return nullptr;
 
@@ -101,11 +101,11 @@ std::shared_ptr<Edge> Triangle::getPreviousEdge(std::shared_ptr<Edge> e)
 
 std::shared_ptr<Edge> Triangle::getNextEdge(std::shared_ptr<Edge> e)
 {
-    if(e->getId() == e1->getId())
+    if(e->getId().compare( e1->getId()) == 0)
         return e2;
-    if(e->getId() == e2->getId())
+    if(e->getId().compare( e2->getId()) == 0)
         return e3;
-    if(e->getId() == e3->getId())
+    if(e->getId().compare( e3->getId()) == 0)
         return e1;
     return nullptr;
 }
@@ -134,9 +134,9 @@ bool Triangle::hasEdge(std::shared_ptr<Edge> e)
 {
     if(e == nullptr)
         return false;
-    return (e1 != nullptr && e1->getId() == e->getId()) ||
-           (e2 != nullptr && e2->getId() == e->getId()) ||
-           (e3 != nullptr && e3->getId() == e->getId());
+    return (e1 != nullptr && e1->getId().compare( e->getId()) == 0) ||
+           (e2 != nullptr && e2->getId().compare( e->getId()) == 0) ||
+           (e3 != nullptr && e3->getId().compare( e->getId()) == 0);
 }
 
 std::shared_ptr<Vertex> Triangle::getV1() const
@@ -169,11 +169,11 @@ std::shared_ptr<Vertex> Triangle::getOppositeVertex(std::shared_ptr<Edge> e) con
 {
     if(e == nullptr)
         return nullptr;
-    if(e1 != nullptr && e1->getId() == e->getId())
+    if(e1 != nullptr && e1->getId().compare( e->getId()) == 0)
         return e2->getCommonVertex(e3);
-    else if(e2 != nullptr && e2->getId() == e->getId())
+    else if(e2 != nullptr && e2->getId().compare( e->getId()) == 0)
         return e1->getCommonVertex(e3);
-    else if(e3 != nullptr && e3->getId() == e->getId())
+    else if(e3 != nullptr && e3->getId().compare( e->getId()) == 0)
         return e1->getCommonVertex(e2);
     return nullptr;
 }
@@ -368,12 +368,12 @@ void Triangle::print(std::ostream &stream)
               " using edges with ids: " << getE1()->getId() << ", " << getE2()->getId() << " and " << getE3()->getId() << std::endl;
 }
 
-unsigned int Triangle::getId() const
+std::string Triangle::getId() const
 {
     return id;
 }
 
-void Triangle::setId(unsigned int newId)
+void Triangle::setId(std::string newId)
 {
     id = newId;
 }

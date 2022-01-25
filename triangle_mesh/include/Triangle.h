@@ -17,8 +17,8 @@ public:
     Triangle(std::shared_ptr<Edge>, std::shared_ptr<Edge>, std::shared_ptr<Edge>);
     Triangle(std::shared_ptr<Triangle>);
     ~Triangle();
-    unsigned int getId() const;
-    void setId(unsigned int newId);
+    std::string getId() const;
+    void setId(std::string newId);
     std::shared_ptr<Vertex>  getV1() const;
     std::shared_ptr<Vertex>  getV2() const;
     std::shared_ptr<Vertex>  getV3() const;
@@ -62,7 +62,7 @@ public:
     void print(std::ostream&);
 
 protected:
-    unsigned int id;
+    std::string id;
     std::shared_ptr<Edge> e1;
     std::shared_ptr<Edge> e2;
     std::shared_ptr<Edge> e3;

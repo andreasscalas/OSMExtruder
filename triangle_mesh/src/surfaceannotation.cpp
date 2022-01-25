@@ -43,7 +43,7 @@ void SurfaceAnnotation::printJson(rapidjson::PrettyWriter<rapidjson::StringBuffe
     for(unsigned int i = 0; i < outlines.size(); i++){
         writer.StartArray();
         for(unsigned j = 0; j < outlines[i].size(); j++)
-            writer.Int(static_cast<int>(outlines[i][j]->getId()));
+            writer.Int(stoi(outlines[i][j]->getId()));
         writer.EndArray();
     }
     writer.EndArray();

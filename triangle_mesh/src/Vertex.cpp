@@ -170,12 +170,12 @@ bool Vertex::clearInfo()
     return true;
 }
 
-unsigned int Vertex::getId() const
+std::string Vertex::getId() const
 {
     return id;
 }
 
-void Vertex::setId(unsigned int newId)
+void Vertex::setId(std::string newId)
 {
     id = newId;
 }
@@ -246,7 +246,7 @@ std::vector<std::shared_ptr<Edge> > Vertex::getVE()
         e = t->getOppositeEdge(v);
     } while (e != e0);
 
-    if (e != nullptr && e->getId() == e0->getId() && ve.size() > 1) return ve;
+    if (e != nullptr && e->getId().compare(e0->getId()) && ve.size() > 1) return ve;
 
     e = e0;
     do

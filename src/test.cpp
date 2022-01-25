@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
                 if(prev == nullptr)
                     polyline.push_back(sourceVertex);
                 else
-                    assert(prev->getId() == sourceVertex->getId());
+                    assert(prev->getId().compare(sourceVertex->getId()) == 0);
                 polyline.push_back(destinationVertex);
                 prev = destinationVertex;
             }

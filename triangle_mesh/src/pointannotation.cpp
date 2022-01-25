@@ -33,7 +33,7 @@ void PointAnnotation::printJson(rapidjson::PrettyWriter<rapidjson::StringBuffer>
     writer.Key("points");
     writer.StartArray();
     for(unsigned int i = 0; i < points.size(); i++)
-        writer.Int(static_cast<int>(points[i]->getId()));
+        writer.Int(stoi(points[i]->getId()));
     writer.EndArray();
     writer.EndObject();
 }

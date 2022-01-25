@@ -182,7 +182,7 @@ unsigned int TriangleMesh::removeIsolatedVertices()
             std::cout << "Removing vertex with id: " << vertices.at(i)->getId() << std::endl;
             std::shared_ptr<Vertex> v = vertices.at(i);
             for(unsigned int j = i + 1; j < vertices.size(); j++)
-                vertices.at(j)->setId(vertices.at(j)->getId() - 1);
+                vertices.at(j)->setId(std::to_string(stoi(vertices.at(j)->getId()) - 1));
             vertices.erase(vertices.begin() + i);
             v.reset();
             removed++;
@@ -254,7 +254,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
         exterior_boundary_double_array.push_back(tmp->toDoubleArray());
         boundaries.at(0).at(i) = addNewVertex(*tmp);
         tmp.reset();
-        vertices.back()->setId(vertices_id++);
+        vertices.back()->setId(std::to_string(vertices_id++));
         vertices_edges.insert(std::make_pair(vertices.back(), incident));
     }
     /**The remaining boundaries are holes**/
@@ -283,7 +283,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
                 std::shared_ptr<Vertex> v = addNewVertex(*tmp);
                 boundaries.at(i).at(j) = v;
                 tmp.reset();
-                v->setId(vertices_id++);
+                v->setId(std::to_string(vertices_id++));
                 vertices_edges.insert(std::make_pair(v, incident));
                 hole_double_array.push_back(v->toDoubleArray());
                 pos = vertices_id - 1;
@@ -322,7 +322,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
                 std::shared_ptr<Vertex> v = addNewVertex(*tmp);
                 constraints.at(i).at(j) = v;
                 tmp.reset();
-                v->setId(vertices_id++);
+                v->setId(std::to_string(vertices_id++));
                 vertices_edges.insert(std::make_pair(v, incident));
                 constraint_vertices.push_back(v->toDoubleArray());
                 pos = vertices_id - 1;
@@ -347,7 +347,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
     {
         std::vector<std::shared_ptr<Edge> > incident;
         std::shared_ptr<Vertex> v = addNewVertex(generated_points.at(i)[0], generated_points.at(i)[1], 0);
-        v->setId(vertices_id++);
+        v->setId(std::to_string(vertices_id++));
 //        std::cout << "Adding vertex required by Shewchuk's triangle" << std::endl;
 //        v->print(std::cout);
         vertices_edges.insert(std::make_pair(vertices.back(), incident));
@@ -366,7 +366,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
         {
             addNewEdge(vertices.at(v1), vertices.at(v2));
             e1 = edges.back();
-            e1->setId(edges_id++);
+            e1->setId(std::to_string(edges_id++));
             vertices_edges.at(vertices.at(v1)).push_back(e1);
         }
         vertices.at(v1)->setE0(e1);
@@ -377,7 +377,7 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
         {
             addNewEdge(vertices.at(v2), vertices.at(v3));
             e2 = edges.back();
-            e2->setId(edges_id++);
+            e2->setId(std::to_string(edges_id++));
             vertices_edges.at(vertices.at(v2)).push_back(e2);
         }
         vertices.at(v2)->setE0(e2);
@@ -388,13 +388,13 @@ int TriangleMesh::triangulate(std::vector<std::vector<std::shared_ptr<Point> > >
         {
             addNewEdge(vertices.at(v3), vertices.at(v1));
             e3 = edges.back();
-            e3->setId(edges_id++);
+            e3->setId(std::to_string(edges_id++));
             vertices_edges.at(vertices.at(v3)).push_back(e3);
         }
         vertices.at(v3)->setE0(e3);
 
         addNewTriangle(e1, e2, e3);
-        triangles.back()->setId(triangles_id++);
+        triangles.back()->setId(std::to_string(triangles_id++));
         if(e1->getT1() == nullptr)
            e1->setT1(triangles.back());
         else if(e1->getT2() == nullptr)
@@ -500,7 +500,7 @@ int TriangleMesh::loadPLY(std::string filename)
                 sstream >> y;
                 sstream >> z;
                 std::shared_ptr<Vertex> v = addNewVertex(x, y, z);
-                v->setId(reached_vertex_id++);
+                v->setId(std::to_string(reached_vertex_id++));
                 std::vector<std::shared_ptr<Edge> > incident;
                 vertices_edges.insert(std::make_pair(v, incident));
                 if(i % 100 == 0)
@@ -527,7 +527,7 @@ int TriangleMesh::loadPLY(std::string filename)
                 {
                     addNewEdge(vertices.at(v1), vertices.at(v2));
                     e1 = edges.back();
-                    e1->setId(reached_edge_id++);
+                    e1->setId(std::to_string(reached_edge_id++));
                     vertices_edges.at(vertices.at(v1)).push_back(e1);
                 }
                 vertices.at(v1)->setE0(e1);
@@ -538,7 +538,7 @@ int TriangleMesh::loadPLY(std::string filename)
                 {
                     addNewEdge(vertices.at(v2), vertices.at(v3));
                     e2 = edges.back();
-                    e2->setId(reached_edge_id++);
+                    e2->setId(std::to_string(reached_edge_id++));
                     vertices_edges.at(vertices.at(v2)).push_back(e2);
                 }
                 vertices.at(v2)->setE0(e2);
@@ -549,13 +549,13 @@ int TriangleMesh::loadPLY(std::string filename)
                 {
                     addNewEdge(vertices.at(v3), vertices.at(v1));
                     e3 = edges.back();
-                    e3->setId(reached_edge_id++);
+                    e3->setId(std::to_string(reached_edge_id++));
                     vertices_edges.at(vertices.at(v3)).push_back(e3);
                 }
                 vertices.at(v3)->setE0(e3);
 
                 addNewTriangle(e1, e2, e3);
-                triangles.back()->setId(reached_triangle_id++);
+                triangles.back()->setId(std::to_string(reached_triangle_id++));
                 if(e1->getT1() == nullptr)
                    e1->setT1(triangles.back());
                 else if(e1->getT2() == nullptr)

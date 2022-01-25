@@ -47,14 +47,14 @@ public:
     bool removeInfo(void*);
     bool removeInfo(unsigned int);
     bool clearInfo();
-    unsigned int getId() const;
-    void setId(unsigned int newId);
+    std::string getId() const;
+    void setId(std::string newId);
 
     double computeLength() const;
     void print(std::ostream&);
 
 protected:
-    unsigned int id;
+    std::string id;
     std::shared_ptr<Vertex>  v1;
     std::shared_ptr<Vertex>  v2;
     std::shared_ptr<Triangle> t1;
